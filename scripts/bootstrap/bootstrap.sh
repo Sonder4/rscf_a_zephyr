@@ -90,6 +90,10 @@ if [[ ! -f "${WORKSPACE_DIR}/third_party/hal/stm32/stm32cube/stm32f4xx/drivers/i
     "hal_stm32-${HAL_STM32_REV}.zip"
 fi
 
+if [[ -f "${WORKSPACE_DIR}/zephyr/scripts/requirements-base.txt" ]]; then
+  python3 -m pip install -r "${WORKSPACE_DIR}/zephyr/scripts/requirements-base.txt"
+fi
+
 (
   cd "${WORKSPACE_DIR}"
   west zephyr-export

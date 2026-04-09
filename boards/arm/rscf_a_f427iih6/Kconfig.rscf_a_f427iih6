@@ -1,6 +1,2 @@
-if BOARD_RSCF_A_F427IIH6
-
-config BOARD
-  default "rscf_a_f427iih6"
-
-endif
+config BOARD_RSCF_A_F427IIH6
+  select SOC_STM32F427XX

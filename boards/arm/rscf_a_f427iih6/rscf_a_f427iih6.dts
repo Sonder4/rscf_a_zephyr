@@ -1,6 +1,7 @@
 /dts-v1/;
 
 #include <st/f4/stm32f427Xi.dtsi>
+#include <st/f4/stm32f427i(g-i)hx-pinctrl.dtsi>
 #include "rscf_a_f427iih6-pinctrl.dtsi"
 #include <zephyr/dt-bindings/gpio/gpio.h>
 #include <zephyr/dt-bindings/input/input-event-codes.h>
@@ -75,82 +76,106 @@
 };
 
 &usart1 {
-  pinctrl-0 = <&usart1_default>;
+  pinctrl-0 = <&usart1_tx_pb6 &usart1_rx_pb7>;
   pinctrl-names = "default";
   current-speed = <115200>;
   status = "okay";
 };
 
 &usart2 {
-  pinctrl-0 = <&usart2_default>;
+  pinctrl-0 = <&usart2_tx_pd5 &usart2_rx_pd6>;
   pinctrl-names = "default";
   current-speed = <115200>;
   status = "okay";
 };
 
 &usart3 {
-  pinctrl-0 = <&usart3_default>;
+  pinctrl-0 = <&usart3_tx_pd8 &usart3_rx_pd9>;
   pinctrl-names = "default";
   current-speed = <115200>;
   status = "okay";
 };
 
 &usart6 {
-  pinctrl-0 = <&usart6_default>;
+  pinctrl-0 = <&usart6_tx_pg14 &usart6_rx_pg9>;
   pinctrl-names = "default";
   current-speed = <115200>;
   status = "okay";
 };
 
 &uart7 {
-  pinctrl-0 = <&uart7_default>;
+  pinctrl-0 = <&uart7_tx_pe8 &uart7_rx_pe7>;
   pinctrl-names = "default";
   current-speed = <115200>;
   status = "okay";
 };
 
 &uart8 {
-  pinctrl-0 = <&uart8_default>;
+  pinctrl-0 = <&uart8_tx_pe1 &uart8_rx_pe0>;
   pinctrl-names = "default";
   current-speed = <115200>;
   status = "okay";
 };
 
 &can1 {
-  pinctrl-0 = <&can1_default>;
+  pinctrl-0 = <&can1_rx_pd0 &can1_tx_pd1>;
   pinctrl-names = "default";
-  bus-speed = <1000000>;
+  bitrate = <1000000>;
   status = "okay";
 };
 
 &can2 {
-  pinctrl-0 = <&can2_default>;
+  pinctrl-0 = <&can2_rx_pb12 &can2_tx_pb13>;
   pinctrl-names = "default";
-  bus-speed = <1000000>;
+  bitrate = <1000000>;
   status = "okay";
 };
 
 &spi4 {
-  pinctrl-0 = <&spi4_default>;
+  pinctrl-0 = <&rscf_spi4_nss_pe4 &spi4_sck_pe12
+               &rscf_spi4_miso_pe5 &rscf_spi4_mosi_pe6>;
   pinctrl-names = "default";
   status = "okay";
 };
 
 &spi5 {
-  pinctrl-0 = <&spi5_default>;
+  pinctrl-0 = <&spi5_nss_pf6 &spi5_sck_pf7
+               &spi5_miso_pf8 &spi5_mosi_pf9>;
   pinctrl-names = "default";
   status = "okay";
 };
 
 &i2c2 {
-  pinctrl-0 = <&i2c2_default>;
+  pinctrl-0 = <&i2c2_scl_pf1 &i2c2_sda_pf0>;
   pinctrl-names = "default";
   clock-frequency = <I2C_BITRATE_FAST>;
   status = "okay";
 };
 
 &usbotg_fs {
-  pinctrl-0 = <&usb_fs_default>;
+  pinctrl-0 = <&usb_otg_fs_dm_pa11 &usb_otg_fs_dp_pa12>;
   pinctrl-names = "default";
   status = "okay";
+};
+
+&timers4 {
+  status = "okay";
+
+  pwm4: pwm {
+    status = "okay";
+    pinctrl-0 = <&tim4_ch1_pd12 &tim4_ch2_pd13
+                 &tim4_ch3_pd14 &tim4_ch4_pd15>;
+    pinctrl-names = "default";
+  };
+};
+
+&timers5 {
+  status = "okay";
+
+  pwm5: pwm {
+    status = "okay";
+    pinctrl-0 = <&tim5_ch1_pa0 &tim5_ch2_pa1
+                 &tim5_ch3_pa2 &tim5_ch4_pa3>;
+    pinctrl-names = "default";
+  };
 };

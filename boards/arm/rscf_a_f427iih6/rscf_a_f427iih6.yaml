@@ -15,3 +15,4 @@ supported:
   - counter
   - pwm
   - usb_device
+vendor: ncurc

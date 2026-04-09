@@ -6,6 +6,10 @@ list(APPEND DTS_ROOT ${CMAKE_CURRENT_LIST_DIR}/..)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(rscf_a_zephyr)
 
+zephyr_include_directories(${ZEPHYR_BASE}/modules/cmsis_6)
+zephyr_include_directories(${CMAKE_CURRENT_LIST_DIR}/../.workspace/third_party/hal/cmsis/CMSIS/Core/Include)
+zephyr_compile_definitions(SHPR=SHP)
+
 target_include_directories(app PRIVATE
   ${CMAKE_CURRENT_LIST_DIR}/../include
 )

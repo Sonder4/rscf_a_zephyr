@@ -1,5 +1,6 @@
 board:
   name: rscf_a_f427iih6
+  full_name: RSCF A STM32F427IIH6
   vendor: ncurc
   socs:
     - name: stm32f427xx

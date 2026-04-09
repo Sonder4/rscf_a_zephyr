@@ -1,4 +1,10 @@
 mainmenu "RSCF A Zephyr Configuration"
 
+source "Kconfig.zephyr"
+
+menu "RSCF A Options"
+
 rsource "../profiles/Kconfig"
 rsource "../modules/rscf/Kconfig"
+
+endmenu
