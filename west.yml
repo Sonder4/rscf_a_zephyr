@@ -11,6 +11,7 @@ manifest:
       revision: v4.3.0
       path: zephyr
       import: false
+      west-commands: scripts/west-commands.yml
     - name: cmsis
       remote: zephyrproject
       revision: 512cc7e895e8491696b61f7ba8066b4a182569b8
