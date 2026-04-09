@@ -13,11 +13,11 @@ manifest:
       import: false
     - name: cmsis
       remote: zephyrproject
-      revision: v4.3.0
+      revision: 512cc7e895e8491696b61f7ba8066b4a182569b8
       path: third_party/hal/cmsis
     - name: hal_stm32
       remote: zephyrproject
-      revision: v4.3.0
+      revision: 286dd285b5bb4fddafdfff27b5405264e5a61bfe
       path: third_party/hal/stm32
 
   self:
