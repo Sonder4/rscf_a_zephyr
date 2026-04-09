@@ -5,6 +5,7 @@
 #include "rscf_a_f427iih6-pinctrl.dtsi"
 #include <zephyr/dt-bindings/gpio/gpio.h>
 #include <zephyr/dt-bindings/input/input-event-codes.h>
+#include <zephyr/dt-bindings/pwm/pwm.h>
 
 / {
   model = "NCURC RSCF A STM32F427IIH6";
@@ -50,6 +51,30 @@
     can-secondary = <&can2>;
     usb-device = <&usbotg_fs>;
     status-led = <&status_led>;
+  };
+
+  rscf_ext_uart_mux: ext_uart_mux {
+    compatible = "ncurc,rscf-ext-uart-mux";
+    uart = <&uart8>;
+    a-gpios = <&gpiof 0 GPIO_ACTIVE_HIGH>;
+    b-gpios = <&gpiof 1 GPIO_ACTIVE_HIGH>;
+    default-channel = <0>;
+    switch-settle-ms = <1>;
+    status = "okay";
+  };
+
+  rscf_dtof2510_group: dtof2510_group {
+    compatible = "ncurc,rscf-dtof2510-group";
+    mux = <&rscf_ext_uart_mux>;
+    channel-count = <4>;
+    status = "okay";
+  };
+
+  rscf_buzzer: buzzer {
+    compatible = "ncurc,rscf-buzzer";
+    pwms = <&pwm4 1 PWM_MSEC(2) PWM_POLARITY_NORMAL>;
+    startup-frequency-hz = <523>;
+    status = "okay";
   };
 };
 

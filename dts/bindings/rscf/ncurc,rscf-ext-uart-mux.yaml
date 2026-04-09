@@ -1,0 +1,22 @@
+description: RSCF external UART multiplexer
+
+compatible: "ncurc,rscf-ext-uart-mux"
+
+include: base.yaml
+
+properties:
+  uart:
+    type: phandle
+    required: true
+  a-gpios:
+    type: phandle-array
+    required: true
+  b-gpios:
+    type: phandle-array
+    required: true
+  default-channel:
+    type: int
+    default: 0
+  switch-settle-ms:
+    type: int
+    default: 1

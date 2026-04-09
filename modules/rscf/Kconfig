@@ -8,4 +8,28 @@ config RSCF_HEALTH_SERVICE
   bool "Enable RSCF health service"
   default y
 
+config RSCF_LED_STATUS
+  bool "Enable RSCF LED status driver"
+  default y
+
+config RSCF_EXT_UART_MUX
+  bool "Enable RSCF external UART mux driver"
+  default y
+
+config RSCF_BUZZER
+  bool "Enable RSCF buzzer driver"
+  default y
+
+config RSCF_COMM_SERVICE
+  bool "Enable RSCF communication service"
+  default y
+
+config RSCF_DTOF2510
+  bool "Enable RSCF DTOF2510 service"
+  default y
+
+config RSCF_IMU_UART
+  bool "Enable RSCF IMU UART bridge"
+  default y
+
 endmenu

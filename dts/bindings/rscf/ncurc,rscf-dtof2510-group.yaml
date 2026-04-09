@@ -1,0 +1,13 @@
+description: RSCF DTOF2510 logical sensor group
+
+compatible: "ncurc,rscf-dtof2510-group"
+
+include: base.yaml
+
+properties:
+  mux:
+    type: phandle
+    required: true
+  channel-count:
+    type: int
+    default: 4

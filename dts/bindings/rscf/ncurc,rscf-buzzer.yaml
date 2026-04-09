@@ -1,0 +1,13 @@
+description: RSCF buzzer driven by a PWM channel
+
+compatible: "ncurc,rscf-buzzer"
+
+include: base.yaml
+
+properties:
+  pwms:
+    type: phandle-array
+    required: true
+  startup-frequency-hz:
+    type: int
+    default: 523
