@@ -1,0 +1,21 @@
+menu "RSCF Profiles"
+
+choice RSCF_PROFILE
+  prompt "Active RSCF application profile"
+  default RSCF_PROFILE_MINIMAL_BRINGUP
+
+config RSCF_PROFILE_MINIMAL_BRINGUP
+  bool "Minimal bring-up profile"
+
+config RSCF_PROFILE_COMM
+  bool "Communication validation profile"
+
+config RSCF_PROFILE_CHASSIS
+  bool "Chassis control profile"
+
+config RSCF_PROFILE_FULL
+  bool "Full system profile"
+
+endchoice
+
+endmenu

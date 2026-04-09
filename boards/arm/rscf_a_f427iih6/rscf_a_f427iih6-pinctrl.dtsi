@@ -1,0 +1,104 @@
+#include <zephyr/dt-bindings/pinctrl/stm32-pinctrl.h>
+
+&pinctrl {
+  usart1_default: usart1_default {
+    group1 {
+      pinmux = <STM32_PINMUX('B', 6, AF7)>,
+               <STM32_PINMUX('B', 7, AF7)>;
+      bias-disable;
+    };
+  };
+
+  usart2_default: usart2_default {
+    group1 {
+      pinmux = <STM32_PINMUX('D', 5, AF7)>,
+               <STM32_PINMUX('D', 6, AF7)>;
+      bias-disable;
+    };
+  };
+
+  usart3_default: usart3_default {
+    group1 {
+      pinmux = <STM32_PINMUX('D', 8, AF7)>,
+               <STM32_PINMUX('D', 9, AF7)>;
+      bias-disable;
+    };
+  };
+
+  usart6_default: usart6_default {
+    group1 {
+      pinmux = <STM32_PINMUX('G', 14, AF8)>,
+               <STM32_PINMUX('G', 9, AF8)>;
+      bias-disable;
+    };
+  };
+
+  uart7_default: uart7_default {
+    group1 {
+      pinmux = <STM32_PINMUX('E', 7, AF8)>,
+               <STM32_PINMUX('E', 8, AF8)>;
+      bias-disable;
+    };
+  };
+
+  uart8_default: uart8_default {
+    group1 {
+      pinmux = <STM32_PINMUX('E', 0, AF8)>,
+               <STM32_PINMUX('E', 1, AF8)>;
+      bias-disable;
+    };
+  };
+
+  can1_default: can1_default {
+    group1 {
+      pinmux = <STM32_PINMUX('D', 0, AF9)>,
+               <STM32_PINMUX('D', 1, AF9)>;
+      bias-disable;
+    };
+  };
+
+  can2_default: can2_default {
+    group1 {
+      pinmux = <STM32_PINMUX('B', 12, AF9)>,
+               <STM32_PINMUX('B', 13, AF9)>;
+      bias-disable;
+    };
+  };
+
+  spi4_default: spi4_default {
+    group1 {
+      pinmux = <STM32_PINMUX('E', 4, AF5)>,
+               <STM32_PINMUX('E', 5, AF5)>,
+               <STM32_PINMUX('E', 6, AF5)>,
+               <STM32_PINMUX('E', 12, AF5)>;
+      bias-disable;
+    };
+  };
+
+  spi5_default: spi5_default {
+    group1 {
+      pinmux = <STM32_PINMUX('F', 6, AF5)>,
+               <STM32_PINMUX('F', 7, AF5)>,
+               <STM32_PINMUX('F', 8, AF5)>,
+               <STM32_PINMUX('F', 9, AF5)>;
+      bias-disable;
+    };
+  };
+
+  i2c2_default: i2c2_default {
+    group1 {
+      pinmux = <STM32_PINMUX('F', 0, AF4)>,
+               <STM32_PINMUX('F', 1, AF4)>;
+      bias-disable;
+      drive-open-drain;
+    };
+  };
+
+  usb_fs_default: usb_fs_default {
+    group1 {
+      pinmux = <STM32_PINMUX('A', 11, AF10)>,
+               <STM32_PINMUX('A', 12, AF10)>;
+      bias-disable;
+    };
+  };
+};

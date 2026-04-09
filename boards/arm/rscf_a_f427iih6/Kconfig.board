@@ -1,0 +1,3 @@
+config BOARD_RSCF_A_F427IIH6
+  bool "RSCF A STM32F427IIH6 board"
+  depends on SOC_STM32F427XX

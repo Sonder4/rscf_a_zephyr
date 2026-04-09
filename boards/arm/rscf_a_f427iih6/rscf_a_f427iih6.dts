@@ -1,0 +1,156 @@
+/dts-v1/;
+
+#include <st/f4/stm32f427Xi.dtsi>
+#include "rscf_a_f427iih6-pinctrl.dtsi"
+#include <zephyr/dt-bindings/gpio/gpio.h>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+  model = "NCURC RSCF A STM32F427IIH6";
+  compatible = "ncurc,rscf-a-f427iih6";
+
+  chosen {
+    zephyr,console = &usart1;
+    zephyr,shell-uart = &usart1;
+    zephyr,sram = &sram0;
+    zephyr,flash = &flash0;
+  };
+
+  aliases {
+    led0 = &status_led;
+    sw0 = &user_button;
+  };
+
+  leds {
+    compatible = "gpio-leds";
+
+    status_led: led_g {
+      gpios = <&gpiof 14 GPIO_ACTIVE_LOW>;
+      label = "LED_G";
+    };
+  };
+
+  buttons {
+    compatible = "gpio-keys";
+
+    user_button: user_button {
+      gpios = <&gpiob 2 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+      label = "Key";
+      zephyr,code = <INPUT_KEY_0>;
+    };
+  };
+
+  rscf_board: rscf_board {
+    compatible = "ncurc,rscf-a-board";
+    console-uart = <&usart1>;
+    imu-uart = <&usart6>;
+    ext-mux-uart = <&uart8>;
+    can-primary = <&can1>;
+    can-secondary = <&can2>;
+    usb-device = <&usbotg_fs>;
+    status-led = <&status_led>;
+  };
+};
+
+&clk_hse {
+  clock-frequency = <12000000>;
+  status = "okay";
+};
+
+&pll {
+  clocks = <&clk_hse>;
+  div-m = <6>;
+  mul-n = <168>;
+  div-p = <2>;
+  div-q = <7>;
+  status = "okay";
+};
+
+&rcc {
+  clocks = <&pll>;
+  clock-frequency = <168000000>;
+  ahb-prescaler = <1>;
+  apb1-prescaler = <4>;
+  apb2-prescaler = <2>;
+};
+
+&usart1 {
+  pinctrl-0 = <&usart1_default>;
+  pinctrl-names = "default";
+  current-speed = <115200>;
+  status = "okay";
+};
+
+&usart2 {
+  pinctrl-0 = <&usart2_default>;
+  pinctrl-names = "default";
+  current-speed = <115200>;
+  status = "okay";
+};
+
+&usart3 {
+  pinctrl-0 = <&usart3_default>;
+  pinctrl-names = "default";
+  current-speed = <115200>;
+  status = "okay";
+};
+
+&usart6 {
+  pinctrl-0 = <&usart6_default>;
+  pinctrl-names = "default";
+  current-speed = <115200>;
+  status = "okay";
+};
+
+&uart7 {
+  pinctrl-0 = <&uart7_default>;
+  pinctrl-names = "default";
+  current-speed = <115200>;
+  status = "okay";
+};
+
+&uart8 {
+  pinctrl-0 = <&uart8_default>;
+  pinctrl-names = "default";
+  current-speed = <115200>;
+  status = "okay";
+};
+
+&can1 {
+  pinctrl-0 = <&can1_default>;
+  pinctrl-names = "default";
+  bus-speed = <1000000>;
+  status = "okay";
+};
+
+&can2 {
+  pinctrl-0 = <&can2_default>;
+  pinctrl-names = "default";
+  bus-speed = <1000000>;
+  status = "okay";
+};
+
+&spi4 {
+  pinctrl-0 = <&spi4_default>;
+  pinctrl-names = "default";
+  status = "okay";
+};
+
+&spi5 {
+  pinctrl-0 = <&spi5_default>;
+  pinctrl-names = "default";
+  status = "okay";
+};
+
+&i2c2 {
+  pinctrl-0 = <&i2c2_default>;
+  pinctrl-names = "default";
+  clock-frequency = <I2C_BITRATE_FAST>;
+  status = "okay";
+};
+
+&usbotg_fs {
+  pinctrl-0 = <&usb_fs_default>;
+  pinctrl-names = "default";
+  status = "okay";
+};

@@ -1,0 +1,24 @@
+manifest:
+  version: "1.2"
+
+  remotes:
+    - name: zephyrproject
+      url-base: https://github.com/zephyrproject-rtos
+
+  projects:
+    - name: zephyr
+      remote: zephyrproject
+      revision: v4.3.0
+      path: zephyr
+      import: false
+    - name: cmsis
+      remote: zephyrproject
+      revision: v4.3.0
+      path: third_party/hal/cmsis
+    - name: hal_stm32
+      remote: zephyrproject
+      revision: v4.3.0
+      path: third_party/hal/stm32
+
+  self:
+    path: manifest

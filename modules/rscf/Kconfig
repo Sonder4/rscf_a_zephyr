@@ -1,0 +1,11 @@
+menu "RSCF Services"
+
+config RSCF_EVENT_BUS
+  bool "Enable RSCF event bus"
+  default y
+
+config RSCF_HEALTH_SERVICE
+  bool "Enable RSCF health service"
+  default y
+
+endmenu

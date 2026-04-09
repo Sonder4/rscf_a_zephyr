@@ -1,0 +1,13 @@
+.venv/
+.workspace/
+.west/
+.bootstrap-artifacts/
+build/
+build-*/
+twister-out/
+.pytest_cache/
+__pycache__/
+*.pyc
+compile_commands.json
+zephyr/
+third_party/

@@ -1,0 +1,28 @@
+description: RSCF A board-level hardware manifest
+
+compatible: "ncurc,rscf-a-board"
+
+include: base.yaml
+
+properties:
+  console-uart:
+    type: phandle
+    required: true
+  imu-uart:
+    type: phandle
+    required: true
+  ext-mux-uart:
+    type: phandle
+    required: true
+  can-primary:
+    type: phandle
+    required: true
+  can-secondary:
+    type: phandle
+    required: true
+  usb-device:
+    type: phandle
+    required: true
+  status-led:
+    type: phandle
+    required: true

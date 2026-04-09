@@ -1,0 +1,5 @@
+board:
+  name: rscf_a_f427iih6
+  vendor: ncurc
+  socs:
+    - name: stm32f427xx

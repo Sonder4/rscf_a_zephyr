@@ -1,0 +1,12 @@
+if BOARD_RSCF_A_F427IIH6
+
+config GPIO
+  default y
+
+config SERIAL
+  default y
+
+config PINCTRL
+  default y
+
+endif

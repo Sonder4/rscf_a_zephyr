@@ -1,0 +1,17 @@
+identifier: rscf_a_f427iih6
+name: RSCF A STM32F427IIH6
+type: mcu
+arch: arm
+ram: 256
+flash: 2048
+toolchain:
+  - zephyr
+supported:
+  - gpio
+  - uart
+  - spi
+  - i2c
+  - can
+  - counter
+  - pwm
+  - usb_device
