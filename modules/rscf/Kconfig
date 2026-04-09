@@ -4,6 +4,10 @@ config RSCF_EVENT_BUS
   bool "Enable RSCF event bus"
   default y
 
+config RSCF_DAEMON_SERVICE
+  bool "Enable RSCF daemon service"
+  default y
+
 config RSCF_HEALTH_SERVICE
   bool "Enable RSCF health service"
   default y
@@ -31,5 +35,9 @@ config RSCF_DTOF2510
 config RSCF_IMU_UART
   bool "Enable RSCF IMU UART bridge"
   default y
+
+config RSCF_DEBUG_FAULT
+  bool "Enable RSCF debug fault service"
+  default n
 
 endmenu

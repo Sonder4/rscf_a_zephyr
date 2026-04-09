@@ -25,8 +25,10 @@ target_sources(app PRIVATE
   ../drivers/rscf/rscf_buzzer.c
   ../modules/rscf/core/rscf_app_profile.c
   ../modules/rscf/services/rscf_event_bus.c
+  ../modules/rscf/services/rscf_daemon_service.c
   ../modules/rscf/services/rscf_health_service.c
   ../modules/rscf/services/rscf_comm_service.c
+  ../modules/rscf/services/rscf_debug_fault.c
   ../modules/rscf/devices/rscf_dtof2510.c
   ../modules/rscf/devices/rscf_imu_uart.c
 )

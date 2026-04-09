@@ -12,11 +12,14 @@ struct rscf_dtof2510_frame {
   uint16_t distance_mm;
   uint16_t confidence;
   uint8_t valid;
+  uint32_t tick_ms;
+  uint32_t sample_seq;
 };
 
 int RSCFDtof2510Init(void);
 int RSCFDtof2510InjectFrame(uint8_t channel, const char *line);
 const struct rscf_dtof2510_frame *RSCFDtof2510Latest(uint8_t channel);
+const char *RSCFDtof2510TopicName(uint8_t channel);
 bool RSCFDtof2510Ready(void);
 
 #endif /* RSCF_DTOF2510_H_ */

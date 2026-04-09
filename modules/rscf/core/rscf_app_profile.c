@@ -1,6 +1,8 @@
 #include <zephyr/logging/log.h>
 
 #include <rscf/rscf_app_profile.h>
+#include <rscf/rscf_daemon_service.h>
+#include <rscf/rscf_debug_fault.h>
 #include <rscf/rscf_event_bus.h>
 #include <rscf/rscf_health_service.h>
 #include "rscf_buzzer.h"
@@ -44,6 +46,13 @@ int RSCFAppProfileInit(void)
   }
 #endif
 
+#if defined(CONFIG_RSCF_DAEMON_SERVICE)
+  ret = RSCFDaemonServiceInit();
+  if (ret != 0) {
+    return ret;
+  }
+#endif
+
 #if defined(CONFIG_RSCF_HEALTH_SERVICE)
   ret = RSCFHealthServiceInit();
   if (ret != 0) {
@@ -72,6 +81,13 @@ int RSCFAppProfileInit(void)
   }
 #endif
 
+#if defined(CONFIG_RSCF_DEBUG_FAULT)
+  ret = RSCFDebugFaultInit();
+  if (ret != 0) {
+    return ret;
+  }
+#endif
+
   LOG_INF("profile services initialized");
   return 0;
 }
@@ -85,6 +101,10 @@ void RSCFAppProfileTick(void)
 
 #if defined(CONFIG_RSCF_HEALTH_SERVICE)
   RSCFHealthServiceBeat();
+#endif
+
+#if defined(CONFIG_RSCF_DEBUG_FAULT)
+  RSCFDebugFaultPoll();
 #endif
 }
 
