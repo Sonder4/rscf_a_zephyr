@@ -1,0 +1,53 @@
+/*******************************************************************************
+
+版权所有 (C), 2025-2026, NCU_Roboteam
+
+ *******************************************************************************
+  文 件 名: transport_usb.h
+  版 本 号:  V1.1
+  作    者: Xuan
+  生成日期:  {{ protocol.generation_date if protocol.generation_date is defined else '2026-02-11' }}
+  功能描述: USB传输层实现，包含环形缓冲区 (已整合BSP层)
+  补    充: 协议版本 {{ protocol.protocol_version }}
+
+*******************************************************************************/
+
+#ifndef TRANSPORT_USB_H
+#define TRANSPORT_USB_H
+
+#include "transport_interface.h"
+#include <stdint.h>
+
+/* ST的USB CDC接口头文件，现在由传输层直接包含 */
+#include "usbd_cdc_if.h"
+
+/*******************************************************************************
+ * @brief  USB Transport Layer Initialization
+ * @note   This function should be called after the USB peripheral is initialized
+ *         by MX_USB_DEVICE_Init().
+ ******************************************************************************/
+int USB_Init(void);
+
+/*******************************************************************************
+ * @brief  USB Transport Instance
+ ******************************************************************************/
+extern Transport_interface_t g_usb_transport;
+
+/* --- 环形缓冲区状态管理接口 --- */
+/* 检查接收缓冲区是否溢出 */
+/* @return true if overflowed, false otherwise. */
+bool USB_RxBufferIsOverflowed(void);
+
+/* 清除接收缓冲区溢出标志 */
+void USB_RxBufferClearOverflowFlag(void);
+
+bool USB_DeviceConfigured(void);
+
+bool USB_LinkIsActive(void);
+
+/* --- USB CDC 回调函数 --- */
+/* 这个函数名由ST的USB库定义，必须保留 */
+void BSP_USB_RxCpltCallback(uint8_t* Buf, uint32_t* Len);
+
+
+#endif /* TRANSPORT_USB_H */

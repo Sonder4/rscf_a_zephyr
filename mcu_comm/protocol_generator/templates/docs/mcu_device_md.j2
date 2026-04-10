@@ -1,0 +1,20 @@
+# {{ mcu_device.name }}
+
+- MID: `{{ mcu_device.mid }}`
+- 描述: {{ mcu_device.description }}
+- MCU系列: `{{ mcu_device.family }}`
+- 下位机通信方式: `{{ mcu_device.comm_type }}`
+{% if mcu_device.uart_instance is defined %}- 串口实例: `{{ mcu_device.uart_instance }}`
+{% endif %}- 串口波特率: `{{ mcu_device.baudrate if mcu_device.baudrate is defined else 115200 }}`
+- ROS2 节点名: `{{ mcu_device.ros2_node_name }}`
+- ROS2 Launch: `{{ mcu_device.ros2_launch_file }}`
+- 上位机连接方式: `{{ mcu_device.pc_comm_type }}`
+{% if mcu_device.pc_comm_type == 'serial' %}- 串口设备: `{{ mcu_device.pc_comm.serial_port }}`
+- 上位机波特率: `{{ mcu_device.pc_comm.baudrate if mcu_device.pc_comm.baudrate is defined else mcu_device.baudrate }}`
+{% elif mcu_device.pc_comm_type == 'tcp' %}- TCP 主机: `{{ mcu_device.pc_comm.tcp_host }}`
+- TCP 端口: `{{ mcu_device.pc_comm.tcp_port }}`
+{% endif %}
+
+## 归属数据包
+{% for packet in device_packets %}- `{{ packet.pid }}` `{{ packet.name }}`: `{{ packet.direction }}`
+{% endfor %}

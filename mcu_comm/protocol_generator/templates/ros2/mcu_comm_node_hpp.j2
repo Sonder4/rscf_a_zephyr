@@ -1,0 +1,271 @@
+/**
+ * @file mcu_comm_node.hpp
+ * @brief MCU通信ROS2节点头文件
+ * 
+ * 该文件由代码生成器自动生成，请勿手动修改。
+ * 协议版本: {{ protocol.protocol_version }}
+ */
+
+#ifndef MCU_COMM_NODE_HPP
+#define MCU_COMM_NODE_HPP
+
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
+#include <sensor_msgs/msg/imu.hpp>
+#include <nav_msgs/msg/odometry.hpp>
+#include <geometry_msgs/msg/twist.hpp>
+#include <std_msgs/msg/header.hpp>
+#include <std_msgs/msg/float32.hpp>
+
+#include "manager/comm_manager.hpp"
+#include "protocol/protocol_parser.hpp"
+#include "processor/packet_handlers.hpp"
+#include "transport/can_transport.hpp"
+#include "transport/serial_transport.hpp"
+#include "transport/tcp_transport.hpp"
+
+{% for packet in packets %}
+#include "mcu_comm/msg/{{ packet.name | to_snake_case }}.hpp"
+{% endfor %}
+{% for service in control_plane.services %}
+#include "mcu_comm/srv/{{ service.snake_name }}.hpp"
+{% endfor %}
+{% for action in control_plane.actions %}
+#include "mcu_comm/action/{{ action.snake_name }}.hpp"
+{% endfor %}
+
+#include <memory>
+#include <string>
+#include <atomic>
+#include <mutex>
+#include <condition_variable>
+#include <functional>
+#include <unordered_map>
+#include <vector>
+
+namespace mcu_comm
+{
+
+class McuCommNode : public rclcpp::Node, public IPacketHandler
+{
+public:
+    explicit McuCommNode(const rclcpp::NodeOptions& options = rclcpp::NodeOptions());
+    ~McuCommNode() override;
+
+    // IPacketHandler interface implementation
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+    void on{{ packet.name | to_pascal_case }}(const {{ packet.name }}_t& data) override;
+{% endif %}
+{% endfor %}
+
+    // 数据包回调函数类型定义
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+{% if packet.name == 'CHASSIS_FEEDBACK' %}
+    using {{ packet.name | to_upper_snake }}Callback = std::function<void(const nav_msgs::msg::Odometry& data)>;
+{% elif packet.name == 'IMU_EULER' %}
+    using {{ packet.name | to_upper_snake }}Callback = std::function<void(const sensor_msgs::msg::Imu& data)>;
+{% else %}
+    using {{ packet.name | to_upper_snake }}Callback = std::function<void(const msg::{{ packet.name | to_pascal_case }}& data)>;
+{% endif %}
+{% endif %}
+{% endfor %}
+{% for action in control_plane.actions %}
+    using {{ action.pascal_name }}Action = action::{{ action.pascal_name }};
+    using {{ action.pascal_name }}GoalHandle = rclcpp_action::ServerGoalHandle<{{ action.pascal_name }}Action>;
+{% endfor %}
+
+    // 注册数据包回调函数
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+    void register{{ packet.name | to_upper_snake }}Callback(const {{ packet.name | to_upper_snake }}Callback& callback);
+    void unregister{{ packet.name | to_upper_snake }}Callbacks();
+{% endif %}
+{% endfor %}
+
+private:
+    // 参数
+    std::string transport_type_{"serial"};
+    std::string fallback_transport_type_{"serial"};
+    std::string port_name_;
+    int baud_rate_{115200};
+    std::string tcp_host_{"192.168.1.10"};
+    int tcp_port_{8899};
+    int tcp_timeout_ms_{1000};
+    bool tcp_no_delay_{true};
+    std::string can_device_path_{"/dev/ttyACM1"};
+    int can_channel_{ 1 };
+    int can_tx_id_{ 0x301 };
+    int can_rx_id_{ 0x302 };
+    int can_read_timeout_us_{ 10000 };
+    int timeout_ms_{1000};
+    int device_mid_{ 3 };
+    bool auto_reconnect_{true};
+    int reconnect_interval_ms_{2000};
+    bool debug_enabled_{false};
+    std::string imu_frame_id_{"imu_link"};
+    std::string odom_frame_id_{"odom"};
+    std::string child_frame_id_{"base_link"};
+    double status_publish_rate_{1.0};
+    double heartbeat_rate_{1.0};
+    double cmd_send_rate_{ {{ protocol.link_rate_hz.pc_to_mcu if protocol.link_rate_hz is defined and protocol.link_rate_hz.pc_to_mcu is defined else 100.0 }} };
+
+    // 状态
+    std::atomic<bool> connected_{false};
+    std::atomic<bool> should_reconnect_{false};
+    std::atomic<bool> shutting_down_{false};
+    std::mutex mutex_;
+
+    // 通信组件
+    std::shared_ptr<ProtocolParser> parser_;
+    std::shared_ptr<CommManager> comm_manager_;
+    std::shared_ptr<ITransport> transport_;
+
+    // 发布者
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+{% if packet.name == 'CHASSIS_FEEDBACK' %}
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr {{ packet.name | to_snake_case }}_publisher_;
+{% elif packet.name == 'IMU_EULER' %}
+    rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr {{ packet.name | to_snake_case }}_publisher_;
+{% else %}
+    rclcpp::Publisher<msg::{{ packet.name | to_pascal_case }}>::SharedPtr {{ packet.name | to_snake_case }}_publisher_;
+{% endif %}
+{% endif %}
+{% endfor %}
+    rclcpp::Publisher<std_msgs::msg::Header>::SharedPtr status_publisher_;
+
+    // 订阅者
+    rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_subscriber_;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr heading_target_subscriber_;
+
+    // 定时器
+    rclcpp::TimerBase::SharedPtr status_timer_;
+    rclcpp::TimerBase::SharedPtr reconnect_timer_;
+    rclcpp::TimerBase::SharedPtr cmd_send_timer_;
+
+    // 最新底盘控制命令缓存
+    geometry_msgs::msg::Twist latest_cmd_vel_{};
+    bool latest_cmd_vel_valid_{false};
+    float latest_heading_target_deg_{0.0f};
+    std::mutex cmd_vel_mutex_;
+
+    // 回调存储容器
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+    std::vector<{{ packet.name | to_upper_snake }}Callback> {{ packet.name | to_snake_case }}_callbacks_;
+    std::mutex {{ packet.name | to_snake_case }}_callbacks_mutex_;
+{% endif %}
+{% endfor %}
+
+    // 控制面事务状态
+    std::mutex control_plane_mutex_;
+    std::condition_variable control_plane_cv_;
+    msg::SystemStatus latest_system_status_{};
+    bool latest_system_status_valid_{false};
+    bool pending_service_active_{false};
+    bool pending_service_done_{false};
+    uint8_t pending_service_id_{0U};
+    uint8_t pending_service_ticket_{0U};
+    uint8_t pending_service_result_{0U};
+    uint8_t next_service_ticket_{1U};
+    bool action_active_{false};
+    bool active_action_acknowledged_{false};
+    uint8_t active_action_id_{0U};
+    uint8_t active_action_ticket_{0U};
+    uint8_t active_action_state_{0U};
+    uint8_t active_action_result_{0U};
+    uint8_t active_action_progress_{0U};
+    uint8_t next_action_ticket_{1U};
+    static constexpr uint8_t kControlPlaneMaxRetryCount_{3U};
+
+    // ROS2 service / action 服务器
+{% for service in control_plane.services %}
+    rclcpp::Service<srv::{{ service.pascal_name }}>::SharedPtr {{ service.snake_name }}_service_;
+{% endfor %}
+{% for action in control_plane.actions %}
+    rclcpp_action::Server<action::{{ action.pascal_name }}>::SharedPtr {{ action.snake_name }}_action_server_;
+    std::shared_ptr<{{ action.pascal_name }}GoalHandle> {{ action.snake_name }}_goal_handle_;
+{% endfor %}
+
+    // 初始化函数
+    void initializeParameters();
+    void initializeCommunication();
+    void initializePublishersSubscribers();
+    void initializeTimers();
+
+    // 回调函数
+    void onConnectionStatusChanged(bool connected);
+    void onError(const std::string& error);
+    void onVelocityCommand(const geometry_msgs::msg::Twist::SharedPtr msg);
+    void onHeadingTarget(const std_msgs::msg::Float32::SharedPtr msg);
+    void onCommandSendTimer();
+    void onStatusTimer();
+    void onReconnectTimer();
+
+    // 回调触发函数
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+{% if packet.name == 'CHASSIS_FEEDBACK' %}
+    void invoke{{ packet.name | to_upper_snake }}Callbacks(const nav_msgs::msg::Odometry& data);
+{% elif packet.name == 'IMU_EULER' %}
+    void invoke{{ packet.name | to_upper_snake }}Callbacks(const sensor_msgs::msg::Imu& data);
+{% else %}
+    void invoke{{ packet.name | to_upper_snake }}Callbacks(const msg::{{ packet.name | to_pascal_case }}& data);
+{% endif %}
+{% endif %}
+{% endfor %}
+
+    // 数据解析函数
+    void parseImuData(const std::vector<uint8_t>& data, sensor_msgs::msg::Imu& imu_msg);
+    void parseOdometryData(const std::vector<uint8_t>& data, nav_msgs::msg::Odometry& odom_msg);
+    
+    // 大端序数据解析辅助函数
+    float beToFloat(const std::vector<uint8_t>& data, size_t offset);
+    int16_t beToInt16(const std::vector<uint8_t>& data, size_t offset);
+    uint16_t beToUint16(const std::vector<uint8_t>& data, size_t offset);
+    int32_t beToInt32(const std::vector<uint8_t>& data, size_t offset);
+    uint32_t beToUint32(const std::vector<uint8_t>& data, size_t offset);
+    
+    // 帧构建函数
+    bool buildVelocityCommandFrame(float linear_x, float linear_y, float angular_z,
+                                   float heading_target_deg,
+                                   std::vector<uint8_t>& frame_data);
+    bool buildSystemCmdFrame(const msg::SystemCmd& cmd_msg,
+                             std::vector<uint8_t>& frame_data);
+    bool sendSystemCmdFrame(const msg::SystemCmd& cmd_msg);
+    bool sendServiceRequest(uint8_t service_id, uint8_t service_arg, uint8_t service_ticket);
+    bool waitServiceResponse(uint8_t service_id, uint8_t service_ticket, uint8_t& service_result);
+    bool sendActionCommand(uint8_t action_id, uint8_t action_cmd, uint8_t action_ticket, uint8_t action_param);
+    bool requestServiceWithRetry(uint8_t service_id, uint8_t service_arg, uint8_t service_ticket, uint8_t& service_result);
+    bool waitActionAck(uint8_t action_id, uint8_t action_ticket);
+    bool startActionWithRetry(uint8_t action_id, uint8_t action_ticket, uint8_t action_param);
+    void resetActiveActionState();
+    void publishActiveActionFeedback();
+    void finalizeActiveAction();
+{% for service in control_plane.services %}
+    void handle{{ service.pascal_name }}(
+        const std::shared_ptr<srv::{{ service.pascal_name }}::Request> request,
+        std::shared_ptr<srv::{{ service.pascal_name }}::Response> response);
+{% endfor %}
+{% for action in control_plane.actions %}
+    rclcpp_action::GoalResponse handle{{ action.pascal_name }}Goal(
+        const rclcpp_action::GoalUUID& uuid,
+        std::shared_ptr<const action::{{ action.pascal_name }}::Goal> goal);
+    rclcpp_action::CancelResponse handle{{ action.pascal_name }}Cancel(
+        const std::shared_ptr<{{ action.pascal_name }}GoalHandle> goal_handle);
+    void handle{{ action.pascal_name }}Accepted(
+        const std::shared_ptr<{{ action.pascal_name }}GoalHandle> goal_handle);
+{% endfor %}
+
+    // 重连函数
+    void attemptReconnect();
+    void startReconnectTimer();
+    void stopReconnectTimer();
+    bool isPacketEnabledForCurrentDevice(PacketID pid) const;
+};
+
+} // namespace mcu_comm
+
+#endif // MCU_COMM_NODE_HPP

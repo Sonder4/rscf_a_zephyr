@@ -1,0 +1,23 @@
+/**
+ * @file main.cpp
+ * @brief MCU通信ROS2节点入口
+ * 
+ * 该文件由代码生成器自动生成，请勿手动修改。
+ * 协议版本: {{ protocol.protocol_version }}
+ */
+
+#include <rclcpp/rclcpp.hpp>
+#include "node/mcu_comm_node.hpp"
+
+int main(int argc, char** argv)
+{
+    rclcpp::init(argc, argv);
+    
+    rclcpp::NodeOptions options;
+    auto node = std::make_shared<mcu_comm::McuCommNode>(options);
+    
+    rclcpp::spin(node);
+    
+    rclcpp::shutdown();
+    return 0;
+}

@@ -28,6 +28,10 @@ config RSCF_COMM_SERVICE
   bool "Enable RSCF communication service"
   default y
 
+config RSCF_MOTOR_SERVICE
+  bool "Enable RSCF motor service"
+  default y
+
 config RSCF_DTOF2510
   bool "Enable RSCF DTOF2510 service"
   default y

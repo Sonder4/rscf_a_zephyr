@@ -45,6 +45,7 @@
   rscf_board: rscf_board {
     compatible = "ncurc,rscf-a-board";
     console-uart = <&usart1>;
+    comm-uart = <&uart7>;
     imu-uart = <&usart6>;
     ext-mux-uart = <&uart8>;
     can-primary = <&can1>;

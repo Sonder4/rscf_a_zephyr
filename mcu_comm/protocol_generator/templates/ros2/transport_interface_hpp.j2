@@ -1,0 +1,94 @@
+/**
+ * @file transport_interface.hpp
+ * @brief 传输层接口定义
+ */
+
+#ifndef MCU_COMM_TRANSPORT_TRANSPORT_INTERFACE_HPP
+#define MCU_COMM_TRANSPORT_TRANSPORT_INTERFACE_HPP
+
+#include <cstdint>
+#include <functional>
+#include <string>
+
+namespace mcu_comm {
+
+enum class TransportType : uint8_t {
+    Serial = 0,
+    Can = 1,
+    Tcp = 2,
+};
+
+inline TransportType ParseTransportType(const std::string& transport_name)
+{
+    if ((transport_name == "can") || (transport_name == "socketcan")) {
+        return TransportType::Can;
+    }
+    if ((transport_name == "tcp") || (transport_name == "socket") || (transport_name == "network")) {
+        return TransportType::Tcp;
+    }
+    return TransportType::Serial;
+}
+
+inline const char* TransportTypeToString(TransportType transport_type)
+{
+    switch (transport_type) {
+    case TransportType::Can:
+        return "can";
+    case TransportType::Tcp:
+        return "tcp";
+    case TransportType::Serial:
+    default:
+        return "serial";
+    }
+}
+
+/**
+ * @brief 传输层接口基类
+ */
+class ITransport {
+public:
+    virtual ~ITransport() = default;
+
+    /**
+     * @brief 连接传输层
+     * @return true表示成功
+     */
+    virtual bool connect() = 0;
+
+    /**
+     * @brief 断开连接
+     */
+    virtual void disconnect() = 0;
+
+    /**
+     * @brief 检查是否已连接
+     * @return true表示已连接
+     */
+    virtual bool isConnected() const = 0;
+
+    /**
+     * @brief 发送数据
+     * @param data 数据指针
+     * @param size 数据大小
+     * @return true表示成功
+     */
+    virtual bool write(const uint8_t* data, size_t size) = 0;
+
+    /**
+     * @brief 接收数据
+     * @param buffer 接收缓冲区
+     * @param max_size 最大接收大小
+     * @return 实际接收的字节数
+     */
+    virtual size_t read(uint8_t* buffer, size_t max_size) = 0;
+
+    /**
+     * @brief 设置接收回调
+     * @param callback 回调函数
+     */
+    virtual void setReadCallback(std::function<void(const uint8_t*, size_t)> callback) = 0;
+};
+
+} // namespace mcu_comm
+
+#endif // MCU_COMM_TRANSPORT_TRANSPORT_INTERFACE_HPP

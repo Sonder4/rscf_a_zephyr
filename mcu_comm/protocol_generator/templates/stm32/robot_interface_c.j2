@@ -1,0 +1,434 @@
+/*******************************************************************************
+
+                      版权所有 (C), 2025-2026, NCU_Roboteam
+
+ *******************************************************************************
+  文 件 名: robot_interface.c
+  版 本 号: 1.0.0
+  作    者: Xuan
+  生成日期: 2026-02-19
+  功能描述: 机器人应用接口实现
+  补    充: 协议版本 {{ protocol.protocol_version }}
+
+*******************************************************************************/
+
+/********************************包含头文件************************************/
+#include "robot_interface.h"
+#include <string.h>
+#include "main.h"
+#include "bsp_log.h"
+#include "bsp_dwt.h"
+#include "robot_def.h"
+#include "cmd/robot_cmd.h"
+
+#if defined(ONE_BOARD) || defined(CHASSIS_BOARD)
+#include "chassis.h"
+#endif
+
+/********************************文件内宏定义***********************************/
+
+#ifndef MCU_COMM_DEBUG_TRACE
+#define MCU_COMM_DEBUG_TRACE 0
+#endif
+
+/* 设备ID - 由代码生成器根据MCU配置自动设置 */
+#define DEVICE_MID  {{ mcu_mid }}  /* {{ mcu_name }} */
+
+/********************************文件内变量************************************/
+
+static bool g_is_initialized = false;
+static TaskHandle_t s_robot_tx_task_handle = NULL;
+
+#if MCU_COMM_DEBUG_TRACE || MCU_COMM_TEST_MODE
+static uint32_t RobotInterfaceGetTickMs(void)
+{
+  return (uint32_t)DWT_GetTimeline_ms();
+}
+#endif
+
+/********************************前向声明************************************/
+
+{% for packet in packets %}
+{% if packet.direction == 'pc_to_mcu' or packet.direction == 'bidirectional' %}
+void {{ packet.name | to_pascal_case }}Callback(void* data);
+{% endif %}
+{% endfor %}
+
+#if MCU_COMM_DEBUG_TRACE
+/**********************************************************************
+  * @ 函数名  ： FloatToU32Bits
+  * @ 功能说明： 将浮点数按位解释为32位无符号整数，便于RTT十六进制日志输出
+  * @ 参数    ： value：输入浮点数
+  * @ 返回值  ： uint32_t位模式
+  ********************************************************************/
+static uint32_t FloatToU32Bits(float value) {
+  uint32_t bits = 0;
+  memcpy(&bits, &value, sizeof(bits));
+  return bits;
+}
+
+/**********************************************************************
+  * @ 函数名  ： RobotDebugTraceTxTick
+  * @ 功能说明： 调试模式下周期发送全量MCU->PC数据包，便于ROS2链路验收
+  * @ 参数    ： 无
+  * @ 返回值  ： 无
+  ********************************************************************/
+static void RobotDebugTraceTxTick(void) {
+  static uint32_t s_last_tick = 0;
+  static uint16_t s_counter = 0;
+  uint32_t now = RobotInterfaceGetTickMs();
+
+  if ((uint32_t)(now - s_last_tick) < 200u) {
+    return;
+  }
+  s_last_tick = now;
+  s_counter++;
+
+  {% for packet in packets %}
+  {% if packet.name == 'CHASSIS_FEEDBACK' and (packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional') %}
+  {
+    float base = ((float)(s_counter % 100u)) * 0.01f;
+    RobotSendChassisFeedback(0.2f + base,
+                             -0.1f + 0.5f * base,
+                             (float)((int32_t)s_counter * 15),
+                             (float)(-(int32_t)s_counter * 9));
+  }
+  {% endif %}
+  {% if packet.name == 'MOTOR_DATA' and (packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional') %}
+  {
+    float base = ((float)(s_counter % 100u)) * 0.01f;
+    RobotSendMotorData(1.0f + base,
+                       0.5f + 0.2f * base,
+                       0.1f + 0.05f * base,
+                       (uint8_t)(s_counter % 8u));
+  }
+  {% endif %}
+  {% if packet.name == 'IMU_EULER' and (packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional') %}
+  RobotSendImuEuler(0.001f * (float)(s_counter % 1000u), 0.2f, -0.15f);
+  {% endif %}
+  {% if packet.name == 'IMU_QUATERNION' and (packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional') %}
+  {
+    float q1 = 0.01f * (float)(s_counter % 10u);
+    float q2 = 0.02f * (float)(s_counter % 10u);
+    float q3 = 0.03f * (float)(s_counter % 10u);
+    RobotSendImuQuaternion(1.0f, q1, q2, q3);
+    LOGINFO("[ri] TX debug #%lu q=[0x%08lX,0x%08lX,0x%08lX,0x%08lX]",
+            (unsigned long)s_counter,
+            (unsigned long)FloatToU32Bits(1.0f),
+            (unsigned long)FloatToU32Bits(q1),
+            (unsigned long)FloatToU32Bits(q2),
+            (unsigned long)FloatToU32Bits(q3));
+  }
+  {% endif %}
+  {% if packet.name == 'SYSTEM_STATUS' and (packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional') %}
+  {
+    uint8_t status_bytes[SYSTEM_STATUS_NUM_BYTES] = {0};
+    status_bytes[0] = (uint8_t)(s_counter & 0x03u);
+    RobotSendSystemStatus(status_bytes);
+  }
+  {% endif %}
+  {% endfor %}
+}
+#endif
+
+/********************************自定义函数************************************/
+
+/**********************************************************************
+  * @ 函数名  ： RobotInterfaceInit
+  * @ 功能说明： 初始化机器人接口
+  * @ 参数    ： 无
+  * @ 返回值  ： true表示成功
+  ********************************************************************/
+bool RobotInterfaceInit(void) {
+  if (g_is_initialized) {
+    return true;
+  }
+
+  /* 初始化PID注册表 */
+  PID_Registry_Init();
+
+  /* 初始化通信管理器（默认transport由生成宏决定） */
+  Comm_Init(NULL);
+
+  /* 注册PID对应的回调函数 */
+{% for packet in packets %}
+{% if packet.direction == 'pc_to_mcu' or packet.direction == 'bidirectional' %}
+  PID_RegisterCallback(PID_{{ packet.name | to_upper_snake }}, {{ packet.name | to_pascal_case }}Callback);
+{% endif %}
+{% endfor %}
+
+  g_is_initialized = true;
+  return true;
+}
+
+/**********************************************************************
+  * @ 函数名  ： RobotInterfaceDeinit
+  * @ 功能说明： 反初始化机器人接口
+  * @ 参数    ： 无
+  * @ 返回值  ： 无
+  ********************************************************************/
+void RobotInterfaceDeinit(void) {
+  g_is_initialized = false;
+}
+
+/**********************************************************************
+  * @ 函数名  ： RobotInterfaceBindTxTask
+  * @ 功能说明： 绑定通信 TX 任务句柄，供事件补发使用
+  * @ 参数    ： task_handle: TX 任务句柄
+  * @ 返回值  ： 无
+  ********************************************************************/
+void RobotInterfaceBindTxTask(TaskHandle_t task_handle) {
+  s_robot_tx_task_handle = task_handle;
+}
+
+/**********************************************************************
+  * @ 函数名  ： RobotInterfaceRequestTxEvent
+  * @ 功能说明： 请求 TX 任务尽快发送事件型报文
+  * @ 参数    ： tx_events: 事件位掩码
+  * @ 返回值  ： 无
+  ********************************************************************/
+void RobotInterfaceRequestTxEvent(uint32_t tx_events) {
+  if (s_robot_tx_task_handle == NULL) {
+    return;
+  }
+
+  (void)xTaskNotify(s_robot_tx_task_handle, tx_events, eSetBits);
+}
+
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+/**********************************************************************
+  * @ 函数名  ： RobotSend{{ packet.name | to_pascal_case }}
+  * @ 功能说明： 发送{{ packet.description }}
+  * @ 参数    ： {% if packet.control_plane_fields is defined %}control_plane_bytes: 固定长度控制面原始字节数组{% else %}{% for field in packet.data_fields %}{{ field.name }}: {{ field.description }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}
+  * @ 返回值  ： true表示成功
+  ********************************************************************/
+{% if packet.control_plane_fields is defined %}
+bool RobotSend{{ packet.name | to_pascal_case }}(const uint8_t *control_plane_bytes) {
+  {{ packet.name | to_camel_case }}_t data;
+
+  if (!g_is_initialized) {
+    return false;
+  }
+  memset(data.{{ packet.control_plane_bytes_field_name }}, 0, sizeof(data.{{ packet.control_plane_bytes_field_name }}));
+
+  if (control_plane_bytes != NULL) {
+    memcpy(data.{{ packet.control_plane_bytes_field_name }},
+           control_plane_bytes,
+           sizeof(data.{{ packet.control_plane_bytes_field_name }}));
+  }
+
+  Comm_Send(DEVICE_MID, PID_{{ packet.name | to_upper_snake }}, (uint8_t*)&data, sizeof(data));
+  return true;
+}
+
+{% else %}
+bool RobotSend{{ packet.name | to_pascal_case }}({% for field in packet.data_fields %}{{ type_mapping[field.type].c_type }} {{ field.name }}{% if not loop.last %}, {% endif %}{% endfor %}) {
+  if (!g_is_initialized) {
+    return false;
+  }
+
+  {{ packet.name | to_camel_case }}_t data;
+{% for field in packet.data_fields %}
+  data.{{ field.name }} = {{ field.name }};
+{% endfor %}
+
+  Comm_Send(DEVICE_MID, PID_{{ packet.name | to_upper_snake }}, (uint8_t*)&data, sizeof(data));
+  return true;
+}
+
+{% endif %}
+{% endif %}
+{% endfor %}
+/**********************************************************************
+  * @ 函数名  ： RobotInterfaceTestTick
+  * @ 功能说明： 测试模式下周期发送固定测试报文
+  * @ 参数    ： 无
+  * @ 返回值  ： 无
+  ********************************************************************/
+void RobotInterfaceTestTick(void) {
+#if MCU_COMM_TEST_MODE
+  static uint32_t s_last_tick = 0;
+  static uint16_t s_counter = 0;
+  uint32_t now = RobotInterfaceGetTickMs();
+
+  if (!g_is_initialized) {
+    return;
+  }
+
+  if ((uint32_t)(now - s_last_tick) < MCU_COMM_TEST_INTERVAL_MS) {
+    return;
+  }
+  s_last_tick = now;
+  s_counter++;
+
+  {% for packet in packets %}
+  {% if packet.name == 'CHASSIS_FEEDBACK' and (packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional') %}
+  RobotSendChassisFeedback(0.5f + 0.01f * (float)(s_counter % 20),
+                           -0.2f,
+                           (float)(s_counter * 10),
+                           -(float)(s_counter * 5));
+  {% endif %}
+  {% if packet.name == 'IMU_EULER' and (packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional') %}
+  RobotSendImuEuler(0.1f, 0.2f, 0.01f * (float)(s_counter % 314));
+  {% endif %}
+  {% if packet.name == 'SYSTEM_STATUS' and (packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional') %}
+  {
+    uint8_t status_bytes[SYSTEM_STATUS_NUM_BYTES] = {0};
+    status_bytes[0] = (uint8_t)(s_counter & 0x03u);
+    RobotSendSystemStatus(status_bytes);
+  }
+  {% endif %}
+  {% endfor %}
+#endif
+}
+
+/* ============================================================================ */
+/*                              回调函数默认实现（弱符号）                        */
+/* ============================================================================ */
+
+{% for packet in packets %}
+{% if packet.direction == 'pc_to_mcu' or packet.direction == 'bidirectional' %}
+__attribute__((weak)) void {{ packet.name | to_pascal_case }}Callback(void* data) {
+  /* 默认实现为空，用户可覆盖此函数 */
+  /* 数据已存储在 g_{{ packet.name | to_snake_case }} 中 */
+  {% if packet.name == 'MOTOR_DATA' %}
+  const {{ packet.name | to_camel_case }}_t* motor_data = (const {{ packet.name | to_camel_case }}_t*)data;
+
+  if (motor_data == NULL) {
+    motor_data = &g_{{ packet.name | to_snake_case }};
+  }
+  {% elif packet.name == 'ROBOT_SWITCH' %}
+  const {{ packet.name | to_camel_case }}_t* robot_switch = (const {{ packet.name | to_camel_case }}_t*)data;
+
+  if (robot_switch == NULL) {
+    robot_switch = &g_{{ packet.name | to_snake_case }};
+  }
+  {% else %}
+  (void)data;
+  {% endif %}
+
+  /* USER CODE BEGIN {{ packet.name | to_pascal_case }}Callback */
+  {% if packet.name == 'MOTOR_DATA' %}
+#if MCU_COMM_DEBUG_TRACE
+  static uint32_t s_cb_count = 0;
+  s_cb_count++;
+  LOGINFO("[ri] MotorData cb#%lu motor=%u speed=0x%08lX pos=0x%08lX torque=0x%08lX",
+          (unsigned long)s_cb_count,
+          motor_data->motor_num,
+          (unsigned long)FloatToU32Bits(motor_data->speed_rads),
+          (unsigned long)FloatToU32Bits(motor_data->position_rad),
+          (unsigned long)FloatToU32Bits(motor_data->torque_nm));
+#endif
+  {% elif packet.name == 'ROBOT_SWITCH' %}
+#if MCU_COMM_DEBUG_TRACE
+  static uint32_t s_cb_count = 0;
+  s_cb_count++;
+  LOGINFO("[ri] RobotSwitch cb#%lu mask=0x%04X",
+          (unsigned long)s_cb_count,
+          robot_switch->switch_mask);
+#endif
+  {% endif %}
+
+  /* USER CODE END {{ packet.name | to_pascal_case }}Callback */
+}
+
+{% endif %}
+{% endfor %}
+/**********************************************************************
+  * @ 函数名  ： RobotInterfaceProcess
+  * @ 功能说明： 主循环处理函数
+  * @ 参数    ： 无
+  * @ 返回值  ： 无
+  ********************************************************************/
+void RobotInterfaceProcess(void) {
+  if (!g_is_initialized) {
+    return;
+  }
+
+  RobotInterfaceProcessRx();
+  RobotInterfaceProcessTxPeriodic();
+}
+
+/**********************************************************************
+  * @ 函数名  ： RobotInterfaceProcessRx
+  * @ 功能说明： 仅处理通信接收方向的数据解析与回调
+  * @ 参数    ： 无
+  * @ 返回值  ： 无
+  ********************************************************************/
+void RobotInterfaceProcessRx(void) {
+  if (!g_is_initialized) {
+    return;
+  }
+
+  Comm_ProcessRx();
+}
+
+/**********************************************************************
+  * @ 函数名  ： RobotInterfaceProcessTxPeriodic
+  * @ 功能说明： 周期发送底盘/状态等上行报文
+  * @ 参数    ： 无
+  * @ 返回值  ： 无
+  ********************************************************************/
+void RobotInterfaceProcessTxPeriodic(void) {
+  if (!g_is_initialized) {
+    return;
+  }
+
+  Comm_Batch_Begin();
+
+#if defined(ONE_BOARD) || defined(CHASSIS_BOARD)
+  ChassisCommPublishTick();
+#endif
+
+#if defined(ONE_BOARD) || defined(GIMBAL_BOARD) || defined(CHASSIS_BOARD)
+  RobotCmdCommPublishTick();
+#endif
+
+  Comm_Batch_End();
+
+#if MCU_COMM_DEBUG_TRACE
+  /* 调试验收阶段，周期发送全量MCU->PC包用于ROS2解析验证 */
+  RobotDebugTraceTxTick();
+#endif
+}
+
+/**********************************************************************
+  * @ 函数名  ： RobotInterfaceProcessTxEvent
+  * @ 功能说明： 处理事件型补发报文
+  * @ 参数    ： tx_events: 事件位掩码
+  * @ 返回值  ： 无
+  ********************************************************************/
+void RobotInterfaceProcessTxEvent(uint32_t tx_events) {
+  if (!g_is_initialized) {
+    return;
+  }
+
+  if ((tx_events & ROBOT_INTERFACE_TX_EVENT_SYSTEM_STATUS) != 0U) {
+#if defined(ONE_BOARD) || defined(GIMBAL_BOARD) || defined(CHASSIS_BOARD)
+    RobotCmdCommPublishNow();
+#endif
+  }
+}
+
+/**********************************************************************
+  * @ 函数名  ： RobotIsConnected
+  * @ 功能说明： 获取通信连接状态
+  * @ 参数    ： 无
+  * @ 返回值  ： true表示已连接
+  ********************************************************************/
+bool RobotIsConnected(void) {
+  if (!g_is_initialized) {
+    return false;
+  }
+  return Comm_IsConnected();
+}
+
+bool RobotRxOverflowed(void) {
+  if (!g_is_initialized) {
+    return false;
+  }
+  return Comm_HasRxOverflow();
+}
+
+/******************************** 文件结束 ************************************/

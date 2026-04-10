@@ -1,0 +1,78 @@
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
+
+
+def _bool_to_launch(value):
+    return "true" if value else "false"
+
+
+def generate_launch_description():
+    transport_type_default = "{{ mcu_device.pc_comm_type }}"
+    fallback_transport_default = transport_type_default
+    serial_port_default = "{{ mcu_device.pc_comm.serial_port if mcu_device.pc_comm_type == 'serial' and mcu_device.pc_comm.serial_port is defined else '/dev/ttyACM1' }}"
+    baud_rate_default = "{{ (mcu_device.pc_comm.baudrate if mcu_device.pc_comm.baudrate is defined else mcu_device.baudrate) if mcu_device.baudrate is defined else 115200 }}"
+    tcp_host_default = "{{ mcu_device.pc_comm.tcp_host if mcu_device.pc_comm_type == 'tcp' and mcu_device.pc_comm.tcp_host is defined else '192.168.1.10' }}"
+    tcp_port_default = "{{ mcu_device.pc_comm.tcp_port if mcu_device.pc_comm_type == 'tcp' and mcu_device.pc_comm.tcp_port is defined else 8899 }}"
+    debug_enabled_default = "{{ "true" if mcu_device.pc_comm.debug_enabled is defined and mcu_device.pc_comm.debug_enabled else "false" }}"
+
+    launch_args = [
+        DeclareLaunchArgument("device_mid", default_value="{{ mcu_device.mid | hex_to_int }}",
+                              description="Target MCU device MID"),
+        DeclareLaunchArgument("transport_type", default_value=transport_type_default,
+                              description="Transport type: serial or tcp"),
+        DeclareLaunchArgument("fallback_transport_type", default_value=fallback_transport_default,
+                              description="Fallback transport type"),
+        DeclareLaunchArgument("port_name", default_value=serial_port_default,
+                              description="Serial port name"),
+        DeclareLaunchArgument("baud_rate", default_value=baud_rate_default,
+                              description="Serial baud rate"),
+        DeclareLaunchArgument("tcp_host", default_value=tcp_host_default,
+                              description="TCP host"),
+        DeclareLaunchArgument("tcp_port", default_value=tcp_port_default,
+                              description="TCP port"),
+        DeclareLaunchArgument("tcp_timeout_ms", default_value="1000",
+                              description="TCP timeout in milliseconds"),
+        DeclareLaunchArgument("tcp_no_delay", default_value="true",
+                              description="Enable TCP_NODELAY"),
+        DeclareLaunchArgument("auto_reconnect", default_value="true",
+                              description="Enable auto reconnect"),
+        DeclareLaunchArgument("reconnect_interval_ms", default_value="2000",
+                              description="Reconnect interval in milliseconds"),
+        DeclareLaunchArgument("debug_enabled", default_value=debug_enabled_default,
+                              description="Enable debug logging"),
+        DeclareLaunchArgument("imu_frame_id", default_value="imu_link",
+                              description="IMU frame ID"),
+        DeclareLaunchArgument("odom_frame_id", default_value="odom",
+                              description="Odometry frame ID"),
+        DeclareLaunchArgument("child_frame_id", default_value="base_link",
+                              description="Child frame ID")
+    ]
+
+    mcu_comm_node = Node(
+        package="mcu_comm",
+        executable="mcu_comm_node",
+        name="{{ mcu_device.ros2_node_name }}",
+        output="screen",
+        parameters=[{
+            "device_mid": ParameterValue(LaunchConfiguration("device_mid"), value_type=int),
+            "transport_type": LaunchConfiguration("transport_type"),
+            "fallback_transport_type": LaunchConfiguration("fallback_transport_type"),
+            "port_name": LaunchConfiguration("port_name"),
+            "baud_rate": ParameterValue(LaunchConfiguration("baud_rate"), value_type=int),
+            "tcp_host": LaunchConfiguration("tcp_host"),
+            "tcp_port": ParameterValue(LaunchConfiguration("tcp_port"), value_type=int),
+            "tcp_timeout_ms": ParameterValue(LaunchConfiguration("tcp_timeout_ms"), value_type=int),
+            "tcp_no_delay": ParameterValue(LaunchConfiguration("tcp_no_delay"), value_type=bool),
+            "auto_reconnect": ParameterValue(LaunchConfiguration("auto_reconnect"), value_type=bool),
+            "reconnect_interval_ms": ParameterValue(LaunchConfiguration("reconnect_interval_ms"), value_type=int),
+            "debug_enabled": ParameterValue(LaunchConfiguration("debug_enabled"), value_type=bool),
+            "imu_frame_id": LaunchConfiguration("imu_frame_id"),
+            "odom_frame_id": LaunchConfiguration("odom_frame_id"),
+            "child_frame_id": LaunchConfiguration("child_frame_id")
+        }],
+    )
+
+    return LaunchDescription([*launch_args, mcu_comm_node])

@@ -1,0 +1,263 @@
+/**
+ * @file comm_manager.cpp
+ * @brief 通信管理器实现（自动生成）
+ * 
+ * 该文件由代码生成器自动生成，请勿手动修改。
+ * 协议版本: {{ protocol.protocol_version }}
+ */
+
+#include "manager/comm_manager.hpp"
+#include <chrono>
+#include <iostream>
+
+namespace mcu_comm {
+
+/* ============================================================================ */
+/*                              构造函数/析构函数                               */
+/* ============================================================================ */
+
+CommManager::CommManager(std::shared_ptr<ITransport> transport,
+                         std::shared_ptr<ProtocolParser> parser)
+    : transport_(std::move(transport)),
+      parser_(std::move(parser)) {
+}
+
+CommManager::~CommManager() {
+    stop();
+}
+
+/* ============================================================================ */
+/*                              初始化/启动/停止                                */
+/* ============================================================================ */
+
+bool CommManager::initialize() {
+    if (!transport_ || !parser_) {
+        std::cerr << "CommManager: transport or parser is null" << std::endl;
+        return false;
+    }
+    
+    return true;
+}
+
+bool CommManager::start() {
+    if (is_running_) {
+        return true;
+    }
+    
+    // 连接传输层
+    if (!transport_->connect()) {
+        std::cerr << "CommManager: failed to connect transport" << std::endl;
+        return false;
+    }
+    
+    is_running_ = true;
+    
+    // 启动接收线程
+    receive_thread_ = std::thread(&CommManager::receiveLoop, this);
+    
+    // 启动处理线程
+    process_thread_ = std::thread(&CommManager::processLoop, this);
+    
+    // 启动心跳线程
+    heartbeat_thread_ = std::thread(&CommManager::heartbeatLoop, this);
+
+    updateConnectionStatus(true);
+    
+    return true;
+}
+
+void CommManager::stop() {
+    is_running_ = false;
+    
+    queue_cv_.notify_all();
+    
+    if (receive_thread_.joinable()) {
+        receive_thread_.join();
+    }
+    
+    if (process_thread_.joinable()) {
+        process_thread_.join();
+    }
+    
+    if (heartbeat_thread_.joinable()) {
+        heartbeat_thread_.join();
+    }
+    
+    if (transport_) {
+        transport_->disconnect();
+    }
+    
+    updateConnectionStatus(false);
+}
+
+/* ============================================================================ */
+/*                              回调注册                                        */
+/* ============================================================================ */
+
+void CommManager::registerCallback(PacketID pid, PacketCallback callback) {
+    std::lock_guard<std::mutex> lock(callback_mutex_);
+    callbacks_[pid] = std::move(callback);
+}
+
+void CommManager::registerConnectionCallback(ConnectionCallback callback) {
+    std::lock_guard<std::mutex> lock(callback_mutex_);
+    connection_callback_ = std::move(callback);
+}
+
+/* ============================================================================ */
+/*                              发送函数                                        */
+/* ============================================================================ */
+
+bool CommManager::sendFrame(PacketID pid, DeviceID mid, const std::vector<uint8_t>& data) {
+    if (!is_running_ || !is_connected_) {
+        return false;
+    }
+    
+    auto frame = parser_->buildFrame(pid, mid, data);
+    frame.heart = heartbeat_counter_++;
+    
+    auto serialized = frame.serialize();
+    
+    if (transport_->write(serialized.data(), serialized.size())) {
+        tx_count_++;
+        return true;
+    }
+    
+    error_count_++;
+    if (!transport_->isConnected()) {
+        updateConnectionStatus(false);
+    }
+    return false;
+}
+
+{% if packets|selectattr('name', 'equalto', 'Heartbeat')|list|length == 0 %}
+bool CommManager::sendHeartbeat() {
+    return true;
+}
+{% else %}
+{% for packet in packets %}
+{% if packet.name == 'Heartbeat' or packet.name == 'HEARTBEAT' %}
+bool CommManager::sendHeartbeat() {
+    std::vector<uint8_t> data = {heartbeat_counter_};
+    return sendFrame(PacketID::{{ packet.name }}, DeviceID::PC_MASTER, data);
+}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+/* ============================================================================ */
+/*                              状态查询                                        */
+/* ============================================================================ */
+
+bool CommManager::isConnected() const {
+    return is_connected_;
+}
+
+void CommManager::getStats(uint32_t& tx_count, uint32_t& rx_count, uint32_t& error_count) const {
+    tx_count = tx_count_.load();
+    rx_count = rx_count_.load();
+    error_count = error_count_.load();
+}
+
+/* ============================================================================ */
+/*                              内部线程函数                                    */
+/* ============================================================================ */
+
+void CommManager::receiveLoop() {
+    constexpr size_t BUFFER_SIZE = 256;
+    uint8_t buffer[BUFFER_SIZE];
+    
+    while (is_running_) {
+        if (!transport_->isConnected()) {
+            if (is_connected_) {
+                updateConnectionStatus(false);
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
+        }
+        
+        size_t bytes_read = transport_->read(buffer, BUFFER_SIZE);
+        
+        if (bytes_read > 0) {
+            auto frames = parser_->parse(buffer, bytes_read);
+            
+            {
+                std::lock_guard<std::mutex> lock(queue_mutex_);
+                for (const auto& frame : frames) {
+                    receive_queue_.push(frame);
+                }
+            }
+            
+            queue_cv_.notify_one();
+            
+            if (!frames.empty()) {
+                rx_count_ += frames.size();
+            }
+        }
+    }
+}
+
+void CommManager::processLoop() {
+    while (is_running_) {
+        std::unique_lock<std::mutex> lock(queue_mutex_);
+        
+        queue_cv_.wait(lock, [this] {
+            return !receive_queue_.empty() || !is_running_;
+        });
+        
+        while (!receive_queue_.empty()) {
+            auto frame = receive_queue_.front();
+            receive_queue_.pop();
+            lock.unlock();
+            
+            dispatchFrame(frame);
+            
+            lock.lock();
+        }
+    }
+}
+
+void CommManager::heartbeatLoop() {
+    while (is_running_) {
+        // 每500ms发送一次心跳
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        
+        if (!is_running_) {
+            break;
+        }
+
+        if (!transport_->isConnected()) {
+            if (is_connected_) {
+                updateConnectionStatus(false);
+            }
+            continue;
+        }
+        
+        // 发送心跳包
+        if (is_connected_) {
+            sendHeartbeat();
+        }
+    }
+}
+
+void CommManager::dispatchFrame(const ProtocolFrame& frame) {
+    std::lock_guard<std::mutex> lock(callback_mutex_);
+    
+    auto it = callbacks_.find(static_cast<PacketID>(frame.pid));
+    if (it != callbacks_.end() && it->second) {
+        it->second(frame.data);
+    }
+}
+
+void CommManager::updateConnectionStatus(bool connected) {
+    if (is_connected_ != connected) {
+        is_connected_ = connected;
+        
+        std::lock_guard<std::mutex> lock(callback_mutex_);
+        if (connection_callback_) {
+            connection_callback_(connected);
+        }
+    }
+}
+
+} // namespace mcu_comm

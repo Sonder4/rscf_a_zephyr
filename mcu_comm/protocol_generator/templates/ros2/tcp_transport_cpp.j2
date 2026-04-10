@@ -1,0 +1,168 @@
+#include "transport/tcp_transport.hpp"
+
+#include <arpa/inet.h>
+#include <cerrno>
+#include <cstring>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <unistd.h>
+
+namespace mcu_comm {
+
+TcpTransport::TcpTransport(const std::string& host, int port, int timeout_ms, bool no_delay)
+    : socket_fd_(-1)
+    , host_(host)
+    , port_(port)
+    , timeout_ms_(timeout_ms)
+    , no_delay_(no_delay)
+    , connected_(false)
+{
+}
+
+TcpTransport::~TcpTransport()
+{
+    disconnect();
+}
+
+bool TcpTransport::connect()
+{
+    struct sockaddr_in server_addr {};
+
+    if (connected_) {
+        return true;
+    }
+
+    socket_fd_ = ::socket(AF_INET, SOCK_STREAM, 0);
+    if (socket_fd_ < 0) {
+        setLastError(std::string("socket() failed: ") + std::strerror(errno));
+        return false;
+    }
+
+    if (!configureSocket()) {
+        ::close(socket_fd_);
+        socket_fd_ = -1;
+        return false;
+    }
+
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(static_cast<uint16_t>(port_));
+    if (::inet_pton(AF_INET, host_.c_str(), &server_addr.sin_addr) <= 0) {
+        setLastError("inet_pton() failed for host " + host_);
+        ::close(socket_fd_);
+        socket_fd_ = -1;
+        return false;
+    }
+
+    if (::connect(socket_fd_, reinterpret_cast<struct sockaddr*>(&server_addr), sizeof(server_addr)) < 0) {
+        setLastError(std::string("connect() failed: ") + std::strerror(errno));
+        ::close(socket_fd_);
+        socket_fd_ = -1;
+        return false;
+    }
+
+    connected_ = true;
+    return true;
+}
+
+void TcpTransport::disconnect()
+{
+    if (socket_fd_ >= 0) {
+        ::close(socket_fd_);
+        socket_fd_ = -1;
+    }
+    connected_ = false;
+}
+
+bool TcpTransport::isConnected() const
+{
+    return connected_;
+}
+
+bool TcpTransport::write(const uint8_t* data, size_t size)
+{
+    size_t total_sent = 0U;
+
+    if (!connected_ || (socket_fd_ < 0) || (data == nullptr) || (size == 0U)) {
+        return false;
+    }
+
+    while (total_sent < size) {
+        const ssize_t sent = ::send(socket_fd_, data + total_sent, size - total_sent, 0);
+        if (sent <= 0) {
+            setLastError(std::string("send() failed: ") + std::strerror(errno));
+            disconnect();
+            return false;
+        }
+        total_sent += static_cast<size_t>(sent);
+    }
+
+    return true;
+}
+
+size_t TcpTransport::read(uint8_t* buffer, size_t max_size)
+{
+    const ssize_t bytes_read = ::recv(socket_fd_, buffer, max_size, 0);
+
+    if (!connected_ || (socket_fd_ < 0) || (buffer == nullptr) || (max_size == 0U)) {
+        return 0U;
+    }
+
+    if (bytes_read > 0) {
+        if (read_callback_) {
+            read_callback_(buffer, static_cast<size_t>(bytes_read));
+        }
+        return static_cast<size_t>(bytes_read);
+    }
+
+    if (bytes_read == 0) {
+        disconnect();
+        return 0U;
+    }
+
+    if ((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
+        return 0U;
+    }
+
+    setLastError(std::string("recv() failed: ") + std::strerror(errno));
+    disconnect();
+    return 0U;
+}
+
+void TcpTransport::setReadCallback(std::function<void(const uint8_t*, size_t)> callback)
+{
+    read_callback_ = std::move(callback);
+}
+
+bool TcpTransport::configureSocket() const
+{
+    struct timeval timeout {};
+
+    timeout.tv_sec = timeout_ms_ / 1000;
+    timeout.tv_usec = static_cast<suseconds_t>((timeout_ms_ % 1000) * 1000);
+
+    if (::setsockopt(socket_fd_, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) != 0) {
+        return false;
+    }
+    if (::setsockopt(socket_fd_, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) != 0) {
+        return false;
+    }
+
+    if (no_delay_) {
+        const int flag = 1;
+        if (::setsockopt(socket_fd_, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag)) != 0) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void TcpTransport::setLastError(const std::string& error)
+{
+    std::lock_guard<std::mutex> lock(error_mutex_);
+    last_error_ = error;
+}
+
+}  // namespace mcu_comm

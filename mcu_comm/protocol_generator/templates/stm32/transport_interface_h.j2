@@ -1,0 +1,94 @@
+/*******************************************************************************
+
+                      版权所有 (C), 2025-2026, NCU_Roboteam
+
+ *******************************************************************************
+  文 件 名: transport_interface.h
+  版 本 号: 1.0.0
+  作    者: Xuan
+  生成日期: {{ protocol.generation_date if protocol.generation_date is defined else '2026-02-11' }}
+  功能描述: 传输层接口定义
+  补    充: 协议版本 {{ protocol.protocol_version }}
+
+*******************************************************************************/
+
+#ifndef TRANSPORT_INTERFACE_H
+#define TRANSPORT_INTERFACE_H
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "FreeRTOS.h"
+#include "semphr.h"
+
+#define MCU_COMM_TRANSPORT_USB  0
+#define MCU_COMM_TRANSPORT_CAN  1
+#define MCU_COMM_TRANSPORT_UART 2
+
+typedef enum
+{
+    MCU_COMM_UART_INSTANCE_NONE = 0,
+    MCU_COMM_UART_INSTANCE_USART1,
+    MCU_COMM_UART_INSTANCE_USART2,
+    MCU_COMM_UART_INSTANCE_USART3,
+    MCU_COMM_UART_INSTANCE_USART6,
+    MCU_COMM_UART_INSTANCE_UART7,
+    MCU_COMM_UART_INSTANCE_UART8,
+} MCUCommUartInstance_e;
+
+#ifndef MCU_COMM_DEFAULT_TRANSPORT
+{% if mcu_device.comm_type == 'can' %}
+#define MCU_COMM_DEFAULT_TRANSPORT MCU_COMM_TRANSPORT_CAN
+{% elif mcu_device.comm_type == 'usart' %}
+#define MCU_COMM_DEFAULT_TRANSPORT MCU_COMM_TRANSPORT_UART
+{% else %}
+#define MCU_COMM_DEFAULT_TRANSPORT MCU_COMM_TRANSPORT_USB
+{% endif %}
+#endif
+
+#ifndef MCU_COMM_DEFAULT_UART_INSTANCE
+{% set uart_default = mcu_device.uart_instance if mcu_device.uart_instance is defined else (transport_config.stm32.uart.default_instance if transport_config.stm32.uart is defined else 'UART7') %}
+{% if uart_default == 'USART1' %}
+#define MCU_COMM_DEFAULT_UART_INSTANCE MCU_COMM_UART_INSTANCE_USART1
+{% elif uart_default == 'USART2' %}
+#define MCU_COMM_DEFAULT_UART_INSTANCE MCU_COMM_UART_INSTANCE_USART2
+{% elif uart_default == 'USART3' %}
+#define MCU_COMM_DEFAULT_UART_INSTANCE MCU_COMM_UART_INSTANCE_USART3
+{% elif uart_default == 'USART6' %}
+#define MCU_COMM_DEFAULT_UART_INSTANCE MCU_COMM_UART_INSTANCE_USART6
+{% elif uart_default == 'UART8' %}
+#define MCU_COMM_DEFAULT_UART_INSTANCE MCU_COMM_UART_INSTANCE_UART8
+{% else %}
+#define MCU_COMM_DEFAULT_UART_INSTANCE MCU_COMM_UART_INSTANCE_UART7
+{% endif %}
+#endif
+
+#ifndef MCU_COMM_UART_BAUDRATE
+#define MCU_COMM_UART_BAUDRATE {{ mcu_device.baudrate if mcu_device.baudrate is defined else (transport_config.stm32.uart.baudrate if transport_config.stm32.uart is defined else 115200) }}U
+#endif
+
+#ifndef MCU_COMM_UART_RX_BUFFER_SIZE
+#define MCU_COMM_UART_RX_BUFFER_SIZE {{ transport_config.stm32.uart.rx_buffer_bytes if transport_config.stm32.uart is defined else 256 }}U
+#endif
+
+#ifndef MCU_COMM_UART_DMA_CHUNK_SIZE
+#define MCU_COMM_UART_DMA_CHUNK_SIZE {{ transport_config.stm32.uart.dma_chunk_size if transport_config.stm32.uart is defined else 255 }}U
+#endif
+
+extern SemaphoreHandle_t xCommDataAvailableSemaphore;
+
+/*******************************************************************************
+ * @brief  Transport Interface Structure
+ ******************************************************************************/
+typedef struct
+{
+    int (*init)(void);
+    int (*send)(uint8_t* data, uint16_t len);
+    int (*receive)(uint8_t* buffer, uint16_t len);
+    bool (*rx_overflowed)(void);
+    void (*clear_rx_overflow)(void);
+    bool (*is_connected)(void);
+} Transport_interface_t;
+
+#endif /* TRANSPORT_INTERFACE_H */
+
+/******************************** 文件结束 ************************************/

@@ -1,0 +1,61 @@
+/*******************************************************************************
+
+                      版权所有 (C), 2025-2026, NCU_Roboteam
+
+ *******************************************************************************
+  文 件 名: transport_can.c
+  版 本 号: 1.0.0
+  作    者: Xuan
+  生成日期: 2026-04-04
+  功能描述: Zephyr CAN 传输层实现
+  补    充: 当前阶段保留初始化与连接状态接口
+
+*******************************************************************************/
+
+#include "transport_can.h"
+
+#include <errno.h>
+
+#include <zephyr/device.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/sys/util.h>
+
+#define RSCF_BOARD_NODE DT_NODELABEL(rscf_board)
+
+static const struct device* g_can_dev;
+static bool g_can_ready;
+
+static bool CAN_TransportIsConnected(void)
+{
+    return g_can_ready;
+}
+
+int CAN_TransportInit(void)
+{
+    g_can_dev = DEVICE_DT_GET(DT_PHANDLE(RSCF_BOARD_NODE, can_primary));
+    g_can_ready = device_is_ready(g_can_dev);
+    return g_can_ready ? 0 : -ENODEV;
+}
+
+static int CAN_TransportSend(uint8_t* data, uint16_t len)
+{
+    ARG_UNUSED(data);
+    ARG_UNUSED(len);
+    return -ENOTSUP;
+}
+
+static int CAN_TransportReceive(uint8_t* buffer, uint16_t len)
+{
+    ARG_UNUSED(buffer);
+    ARG_UNUSED(len);
+    return 0;
+}
+
+Transport_interface_t g_can_transport = {
+    .init = CAN_TransportInit,
+    .send = CAN_TransportSend,
+    .receive = CAN_TransportReceive,
+    .rx_overflowed = NULL,
+    .clear_rx_overflow = NULL,
+    .is_connected = CAN_TransportIsConnected,
+};

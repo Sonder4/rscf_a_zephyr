@@ -1,0 +1,94 @@
+/*******************************************************************************
+
+                      版权所有 (C), 2025-2026, NCU_Roboteam
+
+ *******************************************************************************
+  文 件 名: robot_interface.h
+  版 本 号: 1.0.0
+  作    者: Xuan
+  生成日期: 2026-02-19
+  功能描述: 机器人应用接口头文件
+  补    充: 协议版本 {{ protocol.protocol_version }}
+
+*******************************************************************************/
+
+#ifndef ROBOT_INTERFACE_H_
+#define ROBOT_INTERFACE_H_
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "FreeRTOS.h"
+#include "task.h"
+#include "data_def.h"
+#include "../Modules/comm_manager/core/comm_manager.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/********************************测试模式配置************************************/
+/* MCU通信测试模式：0-关闭，1-开启 */
+#ifndef MCU_COMM_TEST_MODE
+#define MCU_COMM_TEST_MODE 0
+#endif
+
+/* 测试报文发送间隔（毫秒） */
+#ifndef MCU_COMM_TEST_INTERVAL_MS
+#define MCU_COMM_TEST_INTERVAL_MS 100
+#endif
+
+/* 机器人通信发送任务周期（毫秒） */
+#ifndef ROBOT_COMM_TX_TASK_PERIOD_MS
+#define ROBOT_COMM_TX_TASK_PERIOD_MS {{ (1000 / (protocol.link_rate_hz.mcu_to_pc if protocol.link_rate_hz is defined and protocol.link_rate_hz.mcu_to_pc is defined else 200)) | int }}
+#endif
+
+/********************************初始化函数************************************/
+
+bool RobotInterfaceInit(void);
+
+void RobotInterfaceDeinit(void);
+
+/********************************主循环处理************************************/
+
+void RobotInterfaceProcess(void);
+void RobotInterfaceProcessRx(void);
+void RobotInterfaceProcessTxPeriodic(void);
+void RobotInterfaceProcessTxEvent(uint32_t tx_events);
+void RobotInterfaceBindTxTask(TaskHandle_t task_handle);
+void RobotInterfaceRequestTxEvent(uint32_t tx_events);
+
+bool RobotIsConnected(void);
+
+bool RobotRxOverflowed(void);
+
+/********************************事件定义************************************/
+
+#define ROBOT_INTERFACE_TX_EVENT_SYSTEM_STATUS    (1UL << 0)
+
+/********************************测试接口************************************/
+
+void RobotInterfaceTestTick(void);
+
+/********************************发送函数************************************/
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+{% if packet.control_plane_fields is defined %}
+bool RobotSend{{ packet.name | to_pascal_case }}(const uint8_t *control_plane_bytes);
+{% else %}
+bool RobotSend{{ packet.name | to_pascal_case }}({% for field in packet.data_fields %}{{ type_mapping[field.type].c_type }} {{ field.name }}{% if not loop.last %}, {% endif %}{% endfor %});
+{% endif %}
+{% endif %}
+{% endfor %}
+
+/********************************回调函数************************************/
+{% for packet in packets %}
+{% if packet.direction == 'pc_to_mcu' or packet.direction == 'bidirectional' %}
+void {{ packet.name | to_pascal_case }}Callback(void* data);
+{% endif %}
+{% endfor %}
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif  /* ROBOT_INTERFACE_H_ */

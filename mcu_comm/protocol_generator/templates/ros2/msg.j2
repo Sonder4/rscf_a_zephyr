@@ -1,0 +1,17 @@
+{% if packet.control_plane_fields is defined -%}
+uint8[{{ packet.control_plane_num_bytes }}] {{ packet.control_plane_bytes_field_name }}  # 控制面原始字节数组
+{% for field in packet.control_plane_fields -%}
+uint8 {{ field.name }}  # {{ field.description }}
+{% endfor %}
+{% for field in packet.control_plane_fields -%}
+{% if field.is_enum_field -%}
+{% for entry in packet.control_plane_schema.enums[field.enum].entries -%}
+uint8 {{ field.name | to_upper_snake }}_{{ entry.name | to_upper_snake }}={{ entry.value }}
+{% endfor %}
+{% endif -%}
+{% endfor %}
+{% else -%}
+{% for field in packet.data_fields -%}
+{{ type_mapping[field.type].ros_type }} {{ field.name }}  # {{ field.description }}
+{% endfor %}
+{% endif %}

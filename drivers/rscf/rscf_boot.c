@@ -3,11 +3,15 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
+#include "bsp_dwt.h"
+#include "bsp_log.h"
 #include <rscf/rscf_boot.h>
 
 LOG_MODULE_REGISTER(rscf_boot, LOG_LEVEL_INF);
 
 #define RSCF_STATUS_LED_NODE DT_ALIAS(led0)
+
+static bool s_bsp_ready;
 
 int RSCFBootRun(void)
 {
@@ -28,6 +32,15 @@ int RSCFBootRun(void)
   LOG_WRN("status led alias is not defined");
 #endif
 
+  BSPLogInit();
+  DWT_Init(0U);
+  s_bsp_ready = true;
+
   LOG_INF("board bring-up baseline completed");
   return 0;
+}
+
+bool RSCFBootBspReady(void)
+{
+  return s_bsp_ready;
 }

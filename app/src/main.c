@@ -6,6 +6,8 @@
 
 LOG_MODULE_REGISTER(rscf_main, LOG_LEVEL_INF);
 
+#define RSCF_MAIN_LOOP_PERIOD_MS 10
+
 int main(void)
 {
   int ret;
@@ -28,6 +30,6 @@ int main(void)
 
   while (1) {
     RSCFAppProfileTick();
-    k_sleep(K_MSEC(1000));
+    k_sleep(K_MSEC(RSCF_MAIN_LOOP_PERIOD_MS));
   }
 }

@@ -1,0 +1,211 @@
+/**
+ * @file protocol_parser.hpp
+ * @brief 协议解析器头文件（自动生成）
+ * 
+ * 该文件由代码生成器自动生成，请勿手动修改。
+ * 协议版本: 2.0.0
+ */
+
+#ifndef MCU_COMM_PROTOCOL_PARSER_HPP
+#define MCU_COMM_PROTOCOL_PARSER_HPP
+
+#include <cstdint>
+#include <vector>
+#include <array>
+#include <functional>
+#include <memory>
+#include <cstring>
+#include <type_traits>
+
+namespace mcu_comm {
+
+/* ============================================================================ */
+/*                              协议常量                                        */
+/* ============================================================================ */
+
+constexpr uint8_t PROTOCOL_HEADER_H1 = 0x52;
+constexpr uint8_t PROTOCOL_HEADER_H2 = 0x43;
+constexpr uint8_t PROTOCOL_TAIL = 0xED;
+constexpr uint16_t PROTOCOL_CRC_POLY = 0x1021;
+constexpr uint16_t PROTOCOL_CRC_INIT = 0xFFFF;
+constexpr size_t MAX_PACKET_SIZE = 256;
+
+/* ============================================================================ */
+/*                              设备ID枚举                                      */
+/* ============================================================================ */
+
+enum class DeviceID : uint8_t {
+    PC_MASTER = 0x01,
+    MCU_CHASSIS = 0x03,
+    MCU_ARM = 0x04,
+    MCU_ONE = 0x05,
+};
+
+/* ============================================================================ */
+/*                              数据包ID枚举                                    */
+/* ============================================================================ */
+
+enum class PacketID : uint8_t {
+{% for packet in packets %}
+    {{ packet.name | to_upper_snake }} = {{ packet.pid }}{% if not loop.last %},{% endif %}
+{% endfor %}
+};
+
+/* ============================================================================ */
+/*                              协议帧结构                                      */
+/* ============================================================================ */
+
+struct ProtocolFrame {
+    uint8_t header1{PROTOCOL_HEADER_H1};
+    uint8_t header2{PROTOCOL_HEADER_H2};
+    uint8_t heart{0};
+    uint8_t mid{0};
+    uint8_t pl{0};
+    uint8_t pid{0};
+    uint8_t len{0};
+    std::vector<uint8_t> data;
+    uint16_t crc{0};
+    uint8_t tail{PROTOCOL_TAIL};
+    
+    /**
+     * @brief 序列化帧为字节流
+     * @return 字节流
+     */
+    std::vector<uint8_t> serialize() const;
+    
+    /**
+     * @brief 计算CRC16
+     * @return CRC16值
+     */
+    uint16_t calculateCRC() const;
+    
+    /**
+     * @brief 验证CRC
+     * @return true表示CRC正确
+     */
+    bool verifyCRC() const;
+};
+
+/* ============================================================================ */
+/*                              解析器状态                                      */
+/* ============================================================================ */
+
+enum class ParserState {
+    WAIT_HEADER_H1,
+    WAIT_HEADER_H2,
+    WAIT_HEART,
+    WAIT_MID,
+    WAIT_PL,
+    WAIT_PAYLOAD,
+    WAIT_CRC_H,
+    WAIT_CRC_L,
+    WAIT_TAIL
+};
+
+/* ============================================================================ */
+/*                              协议解析器                                      */
+/* ============================================================================ */
+
+class ProtocolParser {
+public:
+    ProtocolParser();
+    ~ProtocolParser() = default;
+    
+    /**
+     * @brief 解析字节流
+     * @param data 字节流指针
+     * @param size 字节流大小
+     * @return 解析出的帧列表
+     */
+    std::vector<ProtocolFrame> parse(const uint8_t* data, size_t size);
+    
+    /**
+     * @brief 解析字节流
+     * @param data 字节流向量
+     * @return 解析出的帧列表
+     */
+    std::vector<ProtocolFrame> parse(const std::vector<uint8_t>& data);
+    
+    /**
+     * @brief 构建帧
+     * @param pid 数据包ID
+     * @param mid 设备ID
+     * @param data 数据
+     * @return 协议帧
+     */
+    ProtocolFrame buildFrame(PacketID pid, DeviceID mid, const std::vector<uint8_t>& data);
+    
+    /**
+     * @brief 重置解析器
+     */
+    void reset();
+    
+    /**
+     * @brief 获取当前状态
+     * @return 解析器状态
+     */
+    ParserState getState() const { return state_; }
+
+public:
+    /**
+     * @brief 计算CRC16字节
+     * @param crc 当前CRC值
+     * @param data 数据字节
+     * @return 新的CRC值
+     */
+    static uint16_t crc16Byte(uint16_t crc, uint8_t data);
+
+private:
+    ParserState state_;
+    ProtocolFrame current_frame_;
+    size_t data_index_;
+    uint16_t calculated_crc_;
+    std::vector<uint8_t> payload_buffer_;
+    
+    /**
+     * @brief 处理单个字节
+     * @param byte 输入字节
+     * @return true表示外层帧完成
+     */
+    bool processByte(uint8_t byte);
+    std::vector<ProtocolFrame> splitPayloadFrames() const;
+    
+    /**
+     * @brief CRC16查找表
+     */
+    static const std::array<uint16_t, 256> crc16_table_;
+};
+
+/* ============================================================================ */
+/*                              字节序转换                                      */
+/* ============================================================================ */
+
+// 小端序协议，无需转换
+template<typename T>
+T hostToNetwork(T value) {
+    return value;
+}
+
+template<typename T>
+T networkToHost(T value) {
+    return value;
+}
+
+// 浮点数字节序转换
+inline float hostToNetworkFloat(float value) {
+    uint32_t temp;
+    static_assert(sizeof(temp) == sizeof(value), "Size mismatch");
+    std::memcpy(&temp, &value, sizeof(temp));
+    temp = hostToNetwork(temp);
+    float result;
+    std::memcpy(&result, &temp, sizeof(result));
+    return result;
+}
+
+inline float networkToHostFloat(float value) {
+    return hostToNetworkFloat(value);
+}
+
+} // namespace mcu_comm
+
+#endif // MCU_COMM_PROTOCOL_PARSER_HPP

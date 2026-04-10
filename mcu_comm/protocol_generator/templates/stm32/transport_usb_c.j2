@@ -1,0 +1,213 @@
+/*******************************************************************************
+
+                      版权所有 (C), 2025-2026, NCU_Roboteam
+
+ *******************************************************************************
+  文 件 名: transport_usb.c
+  版 本 号:  V1.1
+  作    者: Xuan
+  生成日期:  {{ protocol.generation_date if protocol.generation_date is defined else '2026-02-11' }}
+  功能描述: USB传输层实现，包含环形缓冲区 (已整合BSP层)
+  补    充: 协议版本 {{ protocol.protocol_version }}
+
+*******************************************************************************/
+
+/********************************包含头文件************************************/
+#include "transport_usb.h"
+#include <string.h>
+#include <stdbool.h>
+#include "cmsis_os.h"
+#include "main.h"
+#include "bsp_log.h"
+#include "usb_device.h"
+#include "usbd_cdc_if.h"
+
+/*******************************文件内宏定义***********************************/
+#define USB_RX_BUFFER_SIZE 512U
+
+#ifndef MCU_COMM_DEBUG_TRACE
+#define MCU_COMM_DEBUG_TRACE 0
+#endif
+
+#if MCU_COMM_DEBUG_TRACE
+#define USB_TRACE_INFO(format, ...) LOGINFO("[usb] " format, ##__VA_ARGS__)
+#define USB_TRACE_WARN(format, ...) LOGWARNING("[usb] " format, ##__VA_ARGS__)
+#else
+#define USB_TRACE_INFO(format, ...)
+#define USB_TRACE_WARN(format, ...)
+#endif
+
+/*******************************文件内结构体***********************************/
+typedef struct
+{
+    uint8_t buffer[USB_RX_BUFFER_SIZE];
+    volatile uint16_t head;
+    volatile uint16_t tail;
+    volatile bool overflow_flag; /* 使用 bool 类型更清晰 */
+} RingBuffer;
+
+/********************************文件内变量************************************/
+static RingBuffer usb_rx_buffer = {.head = 0, .tail = 0, .overflow_flag = false};
+static uint32_t s_usb_tx_ok_count = 0;
+static uint32_t s_usb_tx_fail_count = 0;
+static uint32_t s_usb_rx_chunk_count = 0;
+
+{% if mcu_device.family == "h7" %}
+extern USBD_HandleTypeDef hUsbDeviceHS;
+{% else %}
+extern USBD_HandleTypeDef hUsbDeviceFS;
+{% endif %}
+
+/********************************自定义函数************************************/
+/* --- 公共接口实现 --- */
+bool USB_RxBufferIsOverflowed(void)
+{
+    return usb_rx_buffer.overflow_flag;
+}
+
+void USB_RxBufferClearOverflowFlag(void)
+{
+    usb_rx_buffer.overflow_flag = false;
+}
+
+static bool USB_TransportIsConnected(void)
+{
+    return USB_LinkIsActive();
+}
+
+bool USB_DeviceConfigured(void)
+{
+{% if mcu_device.family == "h7" %}
+    return (hUsbDeviceHS.dev_state == USBD_STATE_CONFIGURED);
+{% else %}
+    return (hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED);
+{% endif %}
+}
+
+bool USB_LinkIsActive(void)
+{
+    if ((USB_DeviceConfigured() == false) || (usb_rx_buffer.overflow_flag != false))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+/**********************************************************************
+  * @ 函数名  ： USB_Init
+  * @ 功能说明： 初始化USB传输层
+  * @ 补充  ： 原BSP层的初始化现在由main中的MX_USB_DEVICE_Init()完成，
+  *            此函数可以保留作为接口，但内部可以为空。
+  * @ 参数    ： 无
+  * @ 返回值  ： 0: 成功
+  ********************************************************************/
+int USB_Init(void)
+{
+    /* BSP层的初始化（如MX_USB_DEVICE_Init()）通常在main.c中调用 */
+    /* 此传输层本身无需额外初始化。 */
+    return 0;
+}
+
+/**********************************************************************
+  * @ 函数名  ： USB_Send
+  * @ 功能说明： 发送数据 (直接调用ST库函数)
+  * @ 参数    ： data: 数据指针, len: 长度
+  * @ 返回值  ： 0: 成功, 其他: 失败
+  ********************************************************************/
+static int USB_Send(uint8_t* data, uint16_t len)
+{
+    uint8_t status = USBD_FAIL;
+{% if mcu_device.family == "h7" %}
+    status = CDC_Transmit_HS(data, len);
+{% else %}
+    status = CDC_Transmit_FS(data, len);
+{% endif %}
+    if (status == USBD_OK)
+    {
+        s_usb_tx_ok_count++;
+        if ((s_usb_tx_ok_count % 20u) == 1u)
+        {
+            USB_TRACE_INFO("tx ok#%lu len=%u", (unsigned long)s_usb_tx_ok_count, len);
+        }
+        return 0;
+    }
+
+    s_usb_tx_fail_count++;
+    USB_TRACE_WARN("tx fail#%lu status=%u len=%u", (unsigned long)s_usb_tx_fail_count, status, len);
+    return -1;
+}
+
+/**********************************************************************
+  * @ 函数名  ： USB_Receive
+  * @ 功能说明： 从环形缓冲区读取数据
+  * @ 参数    ： buffer: 目标缓冲区, len: 最大读取长度
+  * @ 返回值  ： 实际读取长度
+  ********************************************************************/
+static int USB_Receive(uint8_t* buffer, uint16_t len)
+{
+    int count = 0;
+    while (count < len && usb_rx_buffer.tail != usb_rx_buffer.head)
+    {
+        buffer[count++] = usb_rx_buffer.buffer[usb_rx_buffer.tail];
+        usb_rx_buffer.tail = (usb_rx_buffer.tail + 1) % USB_RX_BUFFER_SIZE;
+    }
+    return count;
+}
+
+/**********************************************************************
+  * @ 函数名  ： BSP_USB_RxCpltCallback
+  * @ 功能说明： USB接收完成回调（由usbd_cdc_if.c调用）
+  * @ 补充  ： 原本在BSP层，现在直接在此实现数据存入环形缓冲区的逻辑
+  * @ 参数    ： Buf: 数据缓冲区, Len: 长度
+  * @ 返回值  ： 无
+  ********************************************************************/
+void BSP_USB_RxCpltCallback(uint8_t* Buf, uint32_t* Len)
+{
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+    /* 直接在此处处理数据，存入环形缓冲区 */
+    /* 移除了原来的 usb_rx_callback 和 USB_Rx_Callback */
+    for (uint32_t i = 0; i < *Len; i++)
+    {
+        uint16_t next_head = (usb_rx_buffer.head + 1) % USB_RX_BUFFER_SIZE;
+        if (next_head != usb_rx_buffer.tail)
+        {
+            usb_rx_buffer.buffer[usb_rx_buffer.head] = Buf[i];
+            usb_rx_buffer.head = next_head;
+        }
+        else
+        {
+            /* 缓冲区已满，设置溢出标志并丢弃数据 */
+            usb_rx_buffer.overflow_flag = true;
+            /* 可以选择在这里记录一次错误，但不要做耗时操作 */
+            break; /* 缓冲区满了，后续数据也存不进，直接退出循环 */
+        }
+    }
+
+    if (*Len > 0)
+    {
+        s_usb_rx_chunk_count++;
+        USB_TRACE_INFO("rx chunk#%lu len=%lu", (unsigned long)s_usb_rx_chunk_count, (unsigned long)(*Len));
+
+        /* 从ISR中释放信号量 */
+        if (xCommDataAvailableSemaphore != NULL)
+        {
+            xSemaphoreGiveFromISR(xCommDataAvailableSemaphore, &xHigherPriorityTaskWoken);
+            /* 如果释放信号量导致了一个更高优先级的任务就绪，则需要立即请求一次上下文切换 */
+            portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+        }
+    }
+}
+
+/* 全局接口实例 */
+Transport_interface_t g_usb_transport = {
+    .init = (int (*)(void))USB_Init, /* 类型转换以匹配接口 */
+    .send = USB_Send,
+    .receive = USB_Receive,
+    .rx_overflowed = USB_RxBufferIsOverflowed,
+    .clear_rx_overflow = USB_RxBufferClearOverflowFlag,
+    .is_connected = USB_TransportIsConnected
+};
+
+/******************************** 文件结束 ************************************/

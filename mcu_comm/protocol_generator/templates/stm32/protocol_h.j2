@@ -1,0 +1,70 @@
+/*******************************************************************************
+
+                      版权所有 (C), 2025-2026, NCU_Roboteam
+
+ *******************************************************************************
+  文 件 名: protocol.h
+  版 本 号: 1.0.0
+  作    者: Xuan
+  生成日期: {{ protocol.generation_date if protocol.generation_date is defined else '2026-02-11' }}
+  功能描述: 通信协议处理层头文件
+  补    充: 协议版本 {{ protocol.protocol_version }}
+
+*******************************************************************************/
+
+#ifndef __PROTOCOL_H
+#define __PROTOCOL_H
+
+#include <stdint.h>
+#include "data_def.h"
+#include "crc16.h"
+
+/*******************************文件内宏定义***********************************/
+
+#define PROTOCOL_HEAD1      {{ frame_format.header[0] }}
+#define PROTOCOL_HEAD2      {{ frame_format.header[1] }}
+#define PROTOCOL_TAIL       {{ frame_format.tail }}
+
+#define PROTOCOL_MAX_DATA_LEN   255
+#define PROTOCOL_FRAME_MIN_LEN  10  /* H1+H2+Heart+MID+PL+PID+LEN+CRC(2)+Tail */
+
+/*******************************文件内结构体***********************************/
+
+typedef struct ProtocolFrame
+{
+    uint8_t header1;
+    uint8_t header2;
+    uint8_t heart;
+    uint8_t mid;
+    uint8_t pl;
+    uint8_t* alldata_ptr; /* 指向数据段数组的指针，使用pid和len作为索引 */
+    uint8_t pid;
+    uint8_t pidLen;
+    uint8_t* pidData_ptr; /* 指向数据段数组的指针，使用pid和len作为索引 */
+    uint16_t crc;
+    uint8_t tail;
+    uint8_t crc_flag;
+} ProtocolFrame_t;
+
+/********************************自定义函数************************************/
+
+void ProtocolFrame_Init(ProtocolFrame_t* frame);
+
+/* 数据打包函数，返回打包后的总长度 */
+uint16_t Protocol_Pack(uint8_t mid, uint8_t pid, const uint8_t* data, uint8_t len, uint8_t* out_buf);
+
+/* 多包数据打包开始，返回当前索引 */
+uint16_t Protocol_Pack_Begin(uint8_t mid, uint8_t* out_buf);
+
+/* 多包数据打包添加数据，返回更新后的索引 */
+uint16_t Protocol_Pack_Add(uint8_t pid, const uint8_t* data, uint8_t len, uint8_t* out_buf, uint16_t current_idx);
+
+/* 多包数据打包结束，返回打包后的总长度 */
+uint16_t Protocol_Pack_End(uint8_t* out_buf, uint16_t current_idx);
+
+/* 数据解包函数 (状态机处理单个字节)，返回1表示接收到完整帧，0表示正在接收，-1表示错误 */
+int8_t Protocol_Unpack(uint8_t byte, ProtocolFrame_t* frame);
+
+#endif /* __PROTOCOL_H */
+
+/******************************** 文件结束 ************************************/

@@ -1,0 +1,23 @@
+{% if action.goal_enum_entries is defined -%}
+{% for entry in action.goal_enum_entries -%}
+uint8 {{ action.goal_field_name | to_upper_snake }}_{{ entry.name | to_upper_snake }}={{ entry.value }}
+{% endfor -%}
+{% endif -%}
+uint8 {{ action.goal_field_name }}  # {{ action.goal_description }}
+---
+uint8 action_id
+uint8 action_state
+uint8 action_ticket
+uint8 action_result
+uint8 task_state  # 当前 action 阶段码，来源于 SYSTEM_STATUS.action_progress
+---
+{% if action.feedback_state_enum_entries is defined -%}
+{% for entry in action.feedback_state_enum_entries -%}
+uint8 TASK_STATE_{{ entry.name | to_upper_snake }}={{ entry.value }}
+{% endfor -%}
+{% endif -%}
+uint8 action_id
+uint8 action_state
+uint8 action_ticket
+uint8 action_result
+uint8 task_state  # 当前 action 阶段码，来源于 SYSTEM_STATUS.action_progress

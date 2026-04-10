@@ -1,0 +1,139 @@
+{% if mcu_device.comm_type == "can" %}
+/*******************************************************************************
+
+                      版权所有 (C), 2025-2026, NCU_Roboteam
+
+ *******************************************************************************
+  文 件 名: transport_can.c
+  版 本 号: 1.0.0
+  作    者: Xuan
+  生成日期: {{ protocol.generation_date if protocol.generation_date is defined else '2026-03-09' }}
+  功能描述: CAN传输层实现，基于 can_comm 字节流桥接
+  补    充: 协议版本 {{ protocol.protocol_version }}
+
+*******************************************************************************/
+
+/********************************包含头文件************************************/
+#include "transport_can.h"
+#include "can_comm.h"
+
+/*******************************文件内变量************************************/
+static CANCommInstance* g_can_comm_instance = NULL;
+static uint8_t g_can_transport_inited = 0;
+
+static bool CAN_TransportIsConnected(void)
+{
+    return ((g_can_transport_inited != 0u) && (g_can_comm_instance != NULL));
+}
+
+/********************************自定义函数************************************/
+int CAN_TransportInit(void)
+{
+    CANComm_Init_Config_s can_comm_config = {
+        .can_config = {
+            .can_handle = &hcan1,
+            .tx_id = {{ transport_config.stm32.can.tx_id }},
+            .rx_id = {{ transport_config.stm32.can.rx_id }},
+        },
+        .send_data_len = {{ transport_config.stm32.can.stream_buffer_bytes }},
+        .recv_data_len = {{ transport_config.stm32.can.stream_buffer_bytes }},
+        .daemon_count = {{ transport_config.stm32.can.offline_timeout_ticks }},
+        .work_mode = CAN_COMM_MODE_STREAM,
+        .stream_buffer_bytes = {{ transport_config.stm32.can.stream_buffer_bytes }},
+        .rx_timeout_ms = {{ transport_config.stm32.can.rx_timeout_ms }},
+    };
+
+    if (g_can_transport_inited != 0u)
+    {
+        return 0;
+    }
+
+    g_can_comm_instance = CANCommInit(&can_comm_config);
+    if (g_can_comm_instance == NULL)
+    {
+        return -1;
+    }
+
+    g_can_transport_inited = 1u;
+    return 0;
+}
+
+static int CAN_TransportSend(uint8_t* data, uint16_t len)
+{
+    if ((g_can_transport_inited == 0u) || (g_can_comm_instance == NULL))
+    {
+        return -1;
+    }
+
+    return CANCommSendEx(g_can_comm_instance, data, len) ? 0 : -1;
+}
+
+static int CAN_TransportReceive(uint8_t* buffer, uint16_t len)
+{
+    if ((g_can_transport_inited == 0u) || (g_can_comm_instance == NULL))
+    {
+        return 0;
+    }
+
+    return (int)CANCommRead(g_can_comm_instance, buffer, len);
+}
+
+Transport_interface_t g_can_transport = {
+    .init = CAN_TransportInit,
+    .send = CAN_TransportSend,
+    .receive = CAN_TransportReceive,
+    .rx_overflowed = NULL,
+    .clear_rx_overflow = NULL,
+    .is_connected = CAN_TransportIsConnected,
+};
+
+{% else %}
+/*******************************************************************************
+
+                      版权所有 (C), 2025-2026, NCU_Roboteam
+
+*******************************************************************************
+  文 件 名: transport_can.c
+  版 本 号: 1.0.0
+  作    者: Xuan
+  生成日期: {{ protocol.generation_date if protocol.generation_date is defined else '2026-04-04' }}
+  功能描述: CAN传输层桩实现（当前MCU未启用CAN通信）
+  补    充: 协议版本 {{ protocol.protocol_version }}
+
+*******************************************************************************/
+
+#include "transport_can.h"
+
+static bool CAN_TransportIsConnected(void)
+{
+    return false;
+}
+
+int CAN_TransportInit(void)
+{
+    return -1;
+}
+
+static int CAN_TransportSend(uint8_t* data, uint16_t len)
+{
+    (void)data;
+    (void)len;
+    return -1;
+}
+
+static int CAN_TransportReceive(uint8_t* buffer, uint16_t len)
+{
+    (void)buffer;
+    (void)len;
+    return 0;
+}
+
+Transport_interface_t g_can_transport = {
+    .init = CAN_TransportInit,
+    .send = CAN_TransportSend,
+    .receive = CAN_TransportReceive,
+    .rx_overflowed = NULL,
+    .clear_rx_overflow = NULL,
+    .is_connected = CAN_TransportIsConnected,
+};
+{% endif %}

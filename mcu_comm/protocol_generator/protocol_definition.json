@@ -1,0 +1,392 @@
+{
+  "protocol_version": "2.0.0",
+  "min_generator_version": "1.0.0",
+  "endianness": "little",
+  "frame_format": {
+    "header": [
+      "0x52",
+      "0x43"
+    ],
+    "tail": "0xED",
+    "crc": {
+      "enabled": true,
+      "polynomial": "0x1021",
+      "initial": "0xFFFF",
+      "xor_out": "0x0000",
+      "ref_in": false,
+      "ref_out": false
+    },
+    "heartbeat": {
+      "enabled": true,
+      "interval_ms": 500,
+      "timeout_ms": 1000
+    }
+  },
+  "device_config": {
+    "pc_hosts": [
+      {
+        "mid": "0x01",
+        "name": "PC_MASTER",
+        "description": "主控PC"
+      }
+    ],
+    "mcu_devices": [
+      {
+        "mid": "0x03",
+        "name": "MCU_CHASSIS",
+        "description": "底盘MCU",
+        "family": "f4",
+        "comm_type": "usb",
+        "baudrate": 115200,
+        "ros2_node_name": "mcu_chassis_node",
+        "ros2_launch_file": "mcu_chassis.launch.py",
+        "pc_comm_type": "tcp",
+        "pc_comm": {
+          "tcp_host": "192.168.1.10",
+          "tcp_port": 8899,
+          "debug_enabled": false
+        }
+      },
+      {
+        "mid": "0x04",
+        "name": "MCU_ARM",
+        "description": "机械臂MCU",
+        "family": "h7",
+        "comm_type": "usb",
+        "baudrate": 115200,
+        "ros2_node_name": "mcu_arm_node",
+        "ros2_launch_file": "mcu_arm.launch.py",
+        "pc_comm_type": "serial",
+        "pc_comm": {
+          "serial_port": "/dev/NCU_STM_ARM",
+          "baudrate": 115200,
+          "debug_enabled": false
+        }
+      },
+      {
+        "mid": "0x05",
+        "name": "MCU_ONE",
+        "description": "一体化MCU（包含所有功能）",
+        "family": "f4",
+        "comm_type": "usart",
+        "uart_instance": "UART7",
+        "baudrate": 115200,
+        "ros2_node_name": "mcu_one_node",
+        "ros2_launch_file": "mcu_one.launch.py",
+        "pc_comm_type": "serial",
+        "pc_comm": {
+          "serial_port": "/dev/serial/by-id/usb-NCUEmbedded_Virtual_ComPort_347D38553133-if00",
+          "baudrate": 115200,
+          "debug_enabled": false
+        }
+      }
+    ]
+  },
+  "transport_config": {
+    "default_transport": "usb",
+    "default_transport_macro": "MCU_COMM_DEFAULT_TRANSPORT_USB",
+    "stm32": {
+      "usb": {
+        "enabled": true
+      },
+      "can": {
+        "enabled": false,
+        "controller": "CAN1",
+        "bitrate": 1000000,
+        "rx_id": "0x301",
+        "tx_id": "0x302",
+        "stream_buffer_bytes": 128,
+        "work_mode_macro": "CAN_COMM_DEFAULT_WORK_MODE",
+        "offline_timeout_ticks": 10,
+        "rx_timeout_ms": 10.0
+      },
+      "uart": {
+        "enabled": true,
+        "default_instance": "UART8",
+        "baudrate": 115200,
+        "rx_buffer_bytes": 256,
+        "dma_chunk_size": 255,
+        "allowed_instances": [
+          "UART8",
+          "USART3",
+          "UART7"
+        ]
+      }
+    },
+    "ros2": {
+      "preferred_transport": "serial",
+      "fallback_transport": "serial",
+      "device_path": "/dev/serial/by-id/usb-NCUEmbedded_Virtual_ComPort_347D38553133-if00",
+      "tcp_host": "192.168.1.10",
+      "tcp_port": 8899,
+      "tcp_timeout_ms": 1000,
+      "tcp_no_delay": true,
+      "channel": 1,
+      "tx_id": "0x301",
+      "rx_id": "0x302",
+      "read_timeout_us": 10000
+    }
+  },
+  "link_rate_hz": {
+    "mcu_to_pc": 100,
+    "pc_to_mcu": 100
+  },
+  "packets": [
+    {
+      "pid": "0x01",
+      "name": "CHASSIS_CTRL",
+      "description": "底盘控制指令",
+      "direction": "pc_to_mcu",
+      "data_fields": [
+        {
+          "name": "speed_mps",
+          "type": "int16",
+          "description": "速度大小，单位: m/s * 1000",
+          "scale": 1000
+        },
+        {
+          "name": "direction_cdeg",
+          "type": "int16",
+          "description": "速度方向，单位: cdeg",
+          "scale": 100
+        },
+        {
+          "name": "yaw_rate_radps",
+          "type": "int16",
+          "description": "旋转速度，单位: rad/s * 1000",
+          "scale": 1000
+        },
+        {
+          "name": "heading_cdeg",
+          "type": "int16",
+          "description": "目标朝向，单位: cdeg；在 TARGET_HEADING/FOLLOW_TARGET 模式下使用",
+          "scale": 100
+        }
+      ],
+      "mid": [
+        "0x03",
+        "0x05"
+      ]
+    },
+    {
+      "pid": "0x02",
+      "name": "CHASSIS_FEEDBACK",
+      "description": "底盘运动状态反馈",
+      "direction": "mcu_to_pc",
+      "ros_topic": "/odom",
+      "ros_message_type": "nav_msgs/Odometry",
+      "data_fields": [
+        {
+          "name": "vx_mps",
+          "type": "float",
+          "description": "X方向速度，单位: m/s"
+        },
+        {
+          "name": "vy_mps",
+          "type": "float",
+          "description": "Y方向速度，单位: m/s"
+        },
+        {
+          "name": "odom_x_mm",
+          "type": "float",
+          "description": "里程计X坐标，单位: mm"
+        },
+        {
+          "name": "odom_y_mm",
+          "type": "float",
+          "description": "里程计Y坐标，单位: mm"
+        }
+      ],
+      "mid": [
+        "0x03",
+        "0x05"
+      ]
+    },
+    {
+      "pid": "0x03",
+      "name": "MOTOR_DATA",
+      "description": "电机控制指令/反馈",
+      "direction": "bidirectional",
+      "data_fields": [
+        {
+          "name": "speed_rads",
+          "type": "float",
+          "description": "电机速度，单位: rad/s"
+        },
+        {
+          "name": "position_rad",
+          "type": "float",
+          "description": "电机位置，单位: rad"
+        },
+        {
+          "name": "torque_nm",
+          "type": "float",
+          "description": "电机力矩，单位: Nm"
+        },
+        {
+          "name": "motor_num",
+          "type": "uint8",
+          "description": "电机编号"
+        }
+      ],
+      "mid": [
+        "0x03",
+        "0x04",
+        "0x05"
+      ]
+    },
+    {
+      "pid": "0x04",
+      "name": "IMU_EULER",
+      "description": "IMU欧拉角原始数据（deg）",
+      "direction": "mcu_to_pc",
+      "ros_topic": "/imu/data",
+      "ros_message_type": "sensor_msgs/Imu",
+      "data_fields": [
+        {
+          "name": "roll",
+          "type": "float",
+          "description": "翻滚角，单位: deg"
+        },
+        {
+          "name": "pitch",
+          "type": "float",
+          "description": "俯仰角，单位: deg"
+        },
+        {
+          "name": "yaw",
+          "type": "float",
+          "description": "偏航角，单位: deg"
+        }
+      ],
+      "mid": [
+        "0x03",
+        "0x05"
+      ]
+    },
+    {
+      "pid": "0x05",
+      "name": "IMU_QUATERNION",
+      "description": "IMU四元数数据",
+      "direction": "mcu_to_pc",
+      "data_fields": [
+        {
+          "name": "q0",
+          "type": "float",
+          "description": "四元数w"
+        },
+        {
+          "name": "q1",
+          "type": "float",
+          "description": "四元数x"
+        },
+        {
+          "name": "q2",
+          "type": "float",
+          "description": "四元数y"
+        },
+        {
+          "name": "q3",
+          "type": "float",
+          "description": "四元数z"
+        }
+      ],
+      "mid": [
+        "0x03",
+        "0x05"
+      ]
+    },
+    {
+      "pid": "0x06",
+      "name": "ROBOT_SWITCH",
+      "description": "机器人开关量",
+      "direction": "pc_to_mcu",
+      "data_fields": [
+        {
+          "name": "switch_mask",
+          "type": "uint16",
+          "description": "开关掩码，bit0-bit15分别对应16个开关"
+        }
+      ],
+      "mid": [
+        "0x03",
+        "0x04",
+        "0x05"
+      ]
+    },
+    {
+      "pid": "0x07",
+      "name": "SYSTEM_STATUS",
+      "description": "系统状态反馈/同步",
+      "direction": "mcu_to_pc",
+      "data_fields": [],
+      "mid": [
+        "0x05"
+      ],
+      "status_schema": "system_status_schema.yaml",
+      "status_num_bytes": 5
+    },
+    {
+      "pid": "0x09",
+      "name": "SYSTEM_CMD",
+      "description": "系统控制命令",
+      "direction": "pc_to_mcu",
+      "data_fields": [],
+      "mid": [
+        "0x05"
+      ],
+      "cmd_schema": "system_cmd_schema.yaml",
+      "cmd_num_bytes": 3
+    }
+  ],
+  "type_mapping": {
+    "int8": {
+      "c_type": "int8_t",
+      "cpp_type": "int8_t",
+      "size": 1,
+      "ros_type": "int8"
+    },
+    "int16": {
+      "c_type": "int16_t",
+      "cpp_type": "int16_t",
+      "size": 2,
+      "ros_type": "int16"
+    },
+    "int32": {
+      "c_type": "int32_t",
+      "cpp_type": "int32_t",
+      "size": 4,
+      "ros_type": "int32"
+    },
+    "uint8": {
+      "c_type": "uint8_t",
+      "cpp_type": "uint8_t",
+      "size": 1,
+      "ros_type": "uint8"
+    },
+    "uint16": {
+      "c_type": "uint16_t",
+      "cpp_type": "uint16_t",
+      "size": 2,
+      "ros_type": "uint16"
+    },
+    "uint32": {
+      "c_type": "uint32_t",
+      "cpp_type": "uint32_t",
+      "size": 4,
+      "ros_type": "uint32"
+    },
+    "float": {
+      "c_type": "float",
+      "cpp_type": "float",
+      "size": 4,
+      "ros_type": "float32"
+    },
+    "double": {
+      "c_type": "double",
+      "cpp_type": "double",
+      "size": 8,
+      "ros_type": "float64"
+    }
+  }
+}

@@ -1,0 +1,94 @@
+/**
+ * @file can_transport.hpp
+ * @brief SOULDE USB2CAN SDK 传输类头文件
+ */
+
+#ifndef MCU_COMM_TRANSPORT_CAN_TRANSPORT_HPP
+#define MCU_COMM_TRANSPORT_CAN_TRANSPORT_HPP
+
+#include <array>
+#include <atomic>
+#include <chrono>
+#include <cstdint>
+#include <deque>
+#include <functional>
+#include <mutex>
+#include <string>
+#include <vector>
+
+#include "transport/transport_interface.hpp"
+
+namespace mcu_comm {
+
+class CanTransport : public mcu_comm::ITransport {
+public:
+    explicit CanTransport(const std::string& device_path = "{{ transport_config.ros2.device_path | default('/dev/ttyACM1') }}",
+                          uint8_t channel = {{ transport_config.ros2.channel | default(1) }},
+                          uint32_t tx_id = {{ transport_config.ros2.tx_id | default('0x301') }},
+                          uint32_t rx_id = {{ transport_config.ros2.rx_id | default('0x302') }},
+                          int32_t read_timeout_us = {{ transport_config.ros2.read_timeout_us | default(10000) }});
+    ~CanTransport() override;
+
+    bool connect() override;
+    void disconnect() override;
+    bool isConnected() const override;
+    bool write(const uint8_t* data, size_t size) override;
+    size_t read(uint8_t* buffer, size_t max_size) override;
+    void setReadCallback(std::function<void(const uint8_t*, size_t)> callback) override;
+
+    std::string getDevicePath() const;
+    uint8_t getChannel() const;
+    uint32_t getTxId() const;
+    uint32_t getRxId() const;
+    int32_t getReadTimeoutUs() const;
+    std::string getLastError() const;
+
+private:
+    enum class RxState : uint8_t {
+        WaitHeader = 0,
+        WaitLength,
+        WaitPayload,
+        WaitCrc,
+        WaitTail,
+    };
+
+    bool pumpSocket();
+    void processCanPayload(const uint8_t* data, size_t size);
+    void processByte(uint8_t byte);
+    void resetRxState();
+    void restartOnHeader(uint8_t byte);
+    void acceptFrame();
+    void setLastError(const std::string& error);
+
+    static constexpr uint8_t kHeader = static_cast<uint8_t>('s');
+    static constexpr uint8_t kTail = static_cast<uint8_t>('e');
+    static constexpr size_t kMaxFrameBytes = {{ transport_config.stm32.can.stream_buffer_bytes | default(128) }};
+    static constexpr std::chrono::milliseconds kRxTimeout{
+        static_cast<int>({{ transport_config.stm32.can.rx_timeout_ms | default(10.0) }})
+    };
+
+    int32_t device_handle_;
+    std::string device_path_;
+    uint8_t channel_;
+    uint32_t tx_id_;
+    uint32_t rx_id_;
+    int32_t read_timeout_us_;
+    std::atomic<bool> connected_;
+    std::function<void(const uint8_t*, size_t)> read_callback_;
+
+    mutable std::mutex error_mutex_;
+    std::string last_error_;
+
+    std::mutex rx_mutex_;
+    std::deque<std::vector<uint8_t>> rx_frames_;
+    RxState rx_state_;
+    std::array<uint8_t, kMaxFrameBytes> rx_payload_;
+    uint16_t rx_length_;
+    uint8_t rx_expected_len_;
+    uint8_t rx_crc_;
+    std::chrono::steady_clock::time_point last_rx_byte_tp_;
+};
+
+}  // namespace mcu_comm
+
+#endif  // MCU_COMM_TRANSPORT_CAN_TRANSPORT_HPP

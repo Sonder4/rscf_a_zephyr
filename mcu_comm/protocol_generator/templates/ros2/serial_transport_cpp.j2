@@ -1,0 +1,378 @@
+/**
+ * @file serial_transport.cpp
+ * @brief 串口传输类实现文件
+ *
+ * 实现基于Linux系统的USB串口通信，支持异步读取。
+ * 协议版本: {{ protocol.protocol_version }}
+ */
+
+#include "transport/serial_transport.hpp"
+
+#include <fcntl.h>
+#include <unistd.h>
+#include <termios.h>
+#include <errno.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <dirent.h>
+#include <sys/stat.h>
+
+#include <chrono>
+#include <algorithm>
+#include <sstream>
+
+namespace mcu_comm {
+
+SerialTransport::SerialTransport(const std::string& port, int baudrate)
+    : fd_(-1)
+    , port_(port)
+    , baudrate_(baudrate)
+    , connected_(false)
+    , async_read_running_(false)
+{
+}
+
+SerialTransport::~SerialTransport()
+{
+    disconnect();
+}
+
+bool SerialTransport::connect()
+{
+    if (connected_) {
+        return true;
+    }
+
+    // 打开串口设备
+    fd_ = ::open(port_.c_str(), O_RDWR | O_NOCTTY);
+    if (fd_ == -1) {
+        std::lock_guard<std::mutex> lock(error_mutex_);
+        last_error_ = std::string("Failed to open port: ") + strerror(errno);
+        return false;
+    }
+
+    // 配置串口参数
+    if (!configurePort()) {
+        ::close(fd_);
+        fd_ = -1;
+        return false;
+    }
+
+    connected_ = true;
+    return true;
+}
+
+bool SerialTransport::connect(const std::string& port, int baudrate)
+{
+    port_ = port;
+    baudrate_ = baudrate;
+    return connect();
+}
+
+void SerialTransport::disconnect()
+{
+    // 停止异步读取线程
+    stopAsyncRead();
+
+    // 关闭文件描述符
+    if (fd_ != -1) {
+        ::close(fd_);
+        fd_ = -1;
+    }
+
+    connected_ = false;
+}
+
+bool SerialTransport::isConnected() const
+{
+    return connected_;
+}
+
+bool SerialTransport::write(const uint8_t* data, size_t size)
+{
+    const auto write_deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
+    size_t total_written = 0;
+
+    if (!connected_ || fd_ == -1) {
+        std::lock_guard<std::mutex> lock(error_mutex_);
+        last_error_ = "Not connected to serial port";
+        return false;
+    }
+
+    if (data == nullptr || size == 0) {
+        std::lock_guard<std::mutex> lock(error_mutex_);
+        last_error_ = "Invalid data or size";
+        return false;
+    }
+
+    while (total_written < size) {
+        ssize_t bytes_written = ::write(fd_, data + total_written, size - total_written);
+
+        if (bytes_written > 0) {
+            total_written += static_cast<size_t>(bytes_written);
+            continue;
+        }
+
+        if (std::chrono::steady_clock::now() >= write_deadline) {
+            std::lock_guard<std::mutex> lock(error_mutex_);
+            last_error_ = "Write timed out before frame drained";
+            return false;
+        }
+
+        if ((bytes_written == 0)
+            || (errno == EINTR)
+            || (errno == EAGAIN)
+            || (errno == EWOULDBLOCK)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            continue;
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(error_mutex_);
+            last_error_ = std::string("Write failed: ") + strerror(errno);
+        }
+        return false;
+    }
+
+    return true;
+}
+
+size_t SerialTransport::read(uint8_t* buffer, size_t size)
+{
+    if (!connected_ || fd_ == -1) {
+        std::lock_guard<std::mutex> lock(error_mutex_);
+        last_error_ = "Not connected to serial port";
+        return 0;
+    }
+
+    if (buffer == nullptr || size == 0) {
+        std::lock_guard<std::mutex> lock(error_mutex_);
+        last_error_ = "Invalid buffer or size";
+        return 0;
+    }
+
+    ssize_t bytes_read = ::read(fd_, buffer, size);
+    if (bytes_read < 0) {
+        std::lock_guard<std::mutex> lock(error_mutex_);
+        last_error_ = std::string("Read failed: ") + strerror(errno);
+        return 0;
+    }
+
+    return static_cast<size_t>(bytes_read);
+}
+
+void SerialTransport::setReadCallback(std::function<void(const uint8_t*, size_t)> callback)
+{
+    read_callback_ = callback;
+}
+
+std::vector<std::string> SerialTransport::availablePorts()
+{
+    std::vector<std::string> ports;
+
+    // 扫描 /dev/ttyACM* 和 /dev/ttyUSB* 设备
+    const char* prefixes[] = {"/dev/ttyACM", "/dev/ttyUSB"};
+
+    for (const char* prefix : prefixes) {
+        for (int i = 0; i < 10; ++i) {
+            std::string port = prefix + std::to_string(i);
+            struct stat stat_buf;
+            if (stat(port.c_str(), &stat_buf) == 0 && S_ISCHR(stat_buf.st_mode)) {
+                ports.push_back(port);
+            }
+        }
+    }
+
+    // 扫描 /sys/class/tty 目录
+    DIR* dir = opendir("/sys/class/tty");
+    if (dir) {
+        struct dirent* entry;
+        while ((entry = readdir(dir)) != nullptr) {
+            std::string name = entry->d_name;
+            if (name.find("ttyACM") == 0 || name.find("ttyUSB") == 0) {
+                std::string port = "/dev/" + name;
+                // 检查是否已经在列表中
+                if (std::find(ports.begin(), ports.end(), port) == ports.end()) {
+                    ports.push_back(port);
+                }
+            }
+        }
+        closedir(dir);
+    }
+
+    return ports;
+}
+
+void SerialTransport::setPort(const std::string& port)
+{
+    port_ = port;
+}
+
+void SerialTransport::setBaudRate(int baudrate)
+{
+    baudrate_ = baudrate;
+}
+
+std::string SerialTransport::getPort() const
+{
+    return port_;
+}
+
+int SerialTransport::getBaudRate() const
+{
+    return baudrate_;
+}
+
+std::string SerialTransport::getLastError() const
+{
+    std::lock_guard<std::mutex> lock(error_mutex_);
+    return last_error_;
+}
+
+bool SerialTransport::startAsyncRead()
+{
+    if (!connected_ || async_read_running_) {
+        return false;
+    }
+
+    async_read_running_ = true;
+    read_thread_ = std::thread(&SerialTransport::readThreadFunc, this);
+
+    return true;
+}
+
+void SerialTransport::stopAsyncRead()
+{
+    if (!async_read_running_) {
+        return;
+    }
+
+    async_read_running_ = false;
+
+    if (read_thread_.joinable()) {
+        read_thread_.join();
+    }
+}
+
+bool SerialTransport::isAsyncReadRunning() const
+{
+    return async_read_running_;
+}
+
+void SerialTransport::readThreadFunc()
+{
+    uint8_t buffer[1024];
+
+    while (async_read_running_ && connected_) {
+        int bytes_read = read(buffer, sizeof(buffer));
+
+        if (bytes_read > 0) {
+            // 成功读取数据，调用回调函数
+            if (read_callback_) {
+                read_callback_(buffer, static_cast<size_t>(bytes_read));
+            }
+        } else if (bytes_read == 0) {
+            // 没有数据可读，短暂休眠后继续
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        } else {
+            // 读取错误
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // 非阻塞模式下无数据可读，继续等待
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            } else {
+                // 其他错误，断开连接
+                {
+                    std::lock_guard<std::mutex> lock(error_mutex_);
+                    last_error_ = std::string("Async read error: ") + strerror(errno);
+                }
+                break;
+            }
+        }
+    }
+
+    // 如果线程退出时仍然连接，说明发生了错误
+    if (connected_) {
+        connected_ = false;
+        if (fd_ != -1) {
+            ::close(fd_);
+            fd_ = -1;
+        }
+    }
+}
+
+bool SerialTransport::configurePort()
+{
+    struct termios options;
+
+    // 获取当前串口配置
+    if (tcgetattr(fd_, &options) != 0) {
+        std::lock_guard<std::mutex> lock(error_mutex_);
+        last_error_ = std::string("Failed to get port attributes: ") + strerror(errno);
+        return false;
+    }
+
+    // 设置波特率
+    speed_t speed;
+    switch (baudrate_) {
+        case 9600:
+            speed = B9600;
+            break;
+        case 19200:
+            speed = B19200;
+            break;
+        case 38400:
+            speed = B38400;
+            break;
+        case 57600:
+            speed = B57600;
+            break;
+        case 115200:
+            speed = B115200;
+            break;
+        case 230400:
+            speed = B230400;
+            break;
+        case 460800:
+            speed = B460800;
+            break;
+        case 921600:
+            speed = B921600;
+            break;
+        default:
+            std::lock_guard<std::mutex> lock(error_mutex_);
+            last_error_ = "Unsupported baudrate: " + std::to_string(baudrate_);
+            return false;
+    }
+
+    /* 必须进入真正 raw 模式，避免 Linux TTY 行规把二进制控制字节改写成 ^X 文本 */
+    cfmakeraw(&options);
+
+    cfsetispeed(&options, speed);
+    cfsetospeed(&options, speed);
+
+    /* 强制 8N1，并关闭所有流控 */
+    options.c_cflag &= ~PARENB;
+    options.c_cflag &= ~CSTOPB;
+    options.c_cflag &= ~CSIZE;
+    options.c_cflag |= CS8;
+    options.c_cflag |= CREAD | CLOCAL;
+    options.c_cflag &= ~CRTSCTS;
+
+    /* 通过 VMIN/VTIME 提供有限等待的阻塞读，避免 O_NONBLOCK 导致短写/零写 */
+    options.c_cc[VMIN] = 0;
+    options.c_cc[VTIME] = 1;
+
+    // 应用配置
+    if (tcsetattr(fd_, TCSANOW, &options) != 0) {
+        std::lock_guard<std::mutex> lock(error_mutex_);
+        last_error_ = std::string("Failed to set port attributes: ") + strerror(errno);
+        return false;
+    }
+
+    // 清空输入输出缓冲区
+    tcflush(fd_, TCIOFLUSH);
+
+    return true;
+}
+
+} // namespace mcu_comm

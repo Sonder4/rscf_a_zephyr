@@ -1,0 +1,136 @@
+/*******************************************************************************
+
+                      版权所有 (C), 2025-2026, NCU_Roboteam
+
+ *******************************************************************************
+  文 件 名: data_def.h
+  版 本 号: 1.0.0
+  作    者: Xuan
+  生成日期: {{ protocol.generation_date if protocol.generation_date is defined else '2026-02-11' }}
+  功能描述: 通信协议数据结构定义与PID分配
+  补    充: 此文件需与PC端完全一致，协议版本 {{ protocol.protocol_version }}
+
+*******************************************************************************/
+
+#ifndef __DATA_DEF_H
+#define __DATA_DEF_H
+
+#include <stdint.h>
+#include <string.h>
+
+/******************************** 设备ID定义 ************************************/
+
+typedef enum
+{
+{% for pc in device_config.pc_hosts %}
+    {{ pc.name }} = {{ pc.mid }},    /* {{ pc.description }} */
+{% endfor %}
+{% for mcu in device_config.mcu_devices %}
+    {{ mcu.name }} = {{ mcu.mid }}{% if not loop.last %},{% endif %}    /* {{ mcu.description }} */
+{% endfor %}
+} DeviceID_t;
+
+/******************************* 控制面共享枚举 **********************************/
+{% for enum_name, enum_info in control_plane.enums.items() %}
+typedef enum
+{
+{% for entry in enum_info.entries %}
+    CONTROL_PLANE_{{ enum_name | to_upper_snake }}_{{ entry.name | to_upper_snake }} = {{ entry.value }}{% if not loop.last %},{% endif %}    /* {{ enum_info.description }} */
+{% endfor %}
+} ControlPlane{{ enum_name | to_pascal_case }}_e;
+
+{% endfor %}
+
+/******************************** PID 分配表 ************************************/
+/* 0x00 保留 */
+{% for packet in packets %}
+#define PID_{{ packet.name | to_upper_snake }}        {{ packet.pid }}    /* {{ packet.description }} */
+{% endfor %}
+
+{% for control_packet in packets if control_packet.control_plane_fields is defined %}
+/******************************* {{ control_packet.name }} 元数据 ****************************/
+
+#define {{ control_packet.name | to_upper_snake }}_NUM_BYTES              {{ control_packet.control_plane_num_bytes }}U
+#define {{ control_packet.name | to_upper_snake }}_DIR_MCU_TO_PC          0U
+#define {{ control_packet.name | to_upper_snake }}_DIR_PC_TO_MCU          1U
+#define {{ control_packet.name | to_upper_snake }}_DIR_BIDIRECTIONAL      2U
+#define {{ control_packet.name | to_upper_snake }}_APPLY_AUTHORITATIVE    0U
+#define {{ control_packet.name | to_upper_snake }}_APPLY_PASSIVE          1U
+
+{% for field in control_packet.control_plane_fields %}
+{% if field.is_enum_field %}
+typedef enum
+{
+{% for entry in control_packet.control_plane_schema.enums[field.enum].entries %}
+    {{ control_packet.name | to_upper_snake }}_{{ field.name | to_upper_snake }}_{{ entry.name | to_upper_snake }} = {{ entry.value }}{% if not loop.last %},{% endif %}    /* {{ field.description }} */
+{% endfor %}
+} {{ control_packet.name | to_pascal_case }}{{ field.name | to_pascal_case }}_e;
+{% endif %}
+
+#define {{ control_packet.name | to_upper_snake }}_{{ field.name | to_upper_snake }}_OFFSET          {{ field.bit_offset }}U
+#define {{ control_packet.name | to_upper_snake }}_{{ field.name | to_upper_snake }}_WIDTH           {{ field.bit_width }}U
+#define {{ control_packet.name | to_upper_snake }}_{{ field.name | to_upper_snake }}_SYNC_DIRECTION  {{ field.sync_direction_macro }}
+#define {{ control_packet.name | to_upper_snake }}_{{ field.name | to_upper_snake }}_APPLY_MODE      {{ field.apply_mode_macro }}
+
+{% endfor %}
+{% endfor %}
+
+/******************************* 数据结构定义 ***********************************/
+
+#pragma pack(1) /* 1字节对齐 */
+
+{% for packet in packets %}
+/* PID: {{ packet.pid }} {{ packet.description }} ({{ packet.total_size }}字节) */
+typedef struct
+{
+{% if packet.control_plane_fields is defined %}
+    uint8_t {{ packet.control_plane_bytes_field_name }}[{{ packet.name | to_upper_snake }}_NUM_BYTES]; /* 控制面原始字节数组 */
+{% else %}
+{% for field in packet.data_fields %}
+    {{ type_mapping[field.type].c_type }} {{ field.name }}; /* {{ field.description }} */
+{% endfor %}
+{% endif %}
+} {{ packet.name | to_camel_case }}_t;
+
+{% endfor %}
+
+#pragma pack()
+
+/******************************** PID注册表定义 ************************************/
+
+typedef void (*PID_Callback_t)(void* data);
+
+typedef struct {
+    uint8_t target_mid;       /* 目标设备ID */
+    uint8_t data_len;         /* 数据长度(字节) */
+    PID_Callback_t callback;  /* 回调函数指针 */
+    void* data_ptr;           /* 结构体数据指针 */
+} PID_Entry_t;
+
+extern PID_Entry_t pid_registry[256];
+
+/******************************** 全局数据结构体实例 ************************************/
+
+{% for packet in packets %}
+extern {{ packet.name | to_camel_case }}_t g_{{ packet.name | to_snake_case }};
+{% endfor %}
+
+/******************************** PID注册表函数 ************************************/
+
+void PID_Registry_Init(void);
+void PID_RegisterCallback(uint8_t pid, PID_Callback_t callback);
+
+/******************************** 序列化函数 ************************************/
+
+{% for packet in packets %}
+uint16_t {{ packet.name | to_snake_case }}_serialize(const {{ packet.name | to_camel_case }}_t* data, uint8_t* buf);
+
+{% endfor %}
+
+/******************************** 字节序说明 ************************************/
+
+/* 协议统一使用小端序，STM32和PC均为小端序机器，无需转换 */
+
+#endif /* __DATA_DEF_H */
+
+/******************************** 文件结束 ************************************/

@@ -1,0 +1,176 @@
+/**
+ * @file serial_transport.hpp
+ * @brief 串口传输类头文件
+ *
+ * 实现基于Linux系统的USB串口通信，支持异步读取。
+ * 协议版本: {{ protocol.protocol_version }}
+ */
+
+#ifndef MCU_COMM_TRANSPORT_SERIAL_TRANSPORT_HPP
+#define MCU_COMM_TRANSPORT_SERIAL_TRANSPORT_HPP
+
+#include <cstdint>
+#include <string>
+#include <vector>
+#include <functional>
+#include <thread>
+#include <atomic>
+#include <mutex>
+
+#include "transport/transport_interface.hpp"
+
+namespace mcu_comm {
+
+/**
+ * @brief 串口传输实现类
+ *
+ * 实现基于Linux系统的USB串口通信，支持异步读取。
+ */
+class SerialTransport : public mcu_comm::ITransport {
+public:
+    /**
+     * @brief 构造函数
+     * @param port 串口设备路径，默认为"/dev/ttyACM0"
+     * @param baudrate 波特率，默认为115200
+     */
+    explicit SerialTransport(const std::string& port = "/dev/ttyACM0", int baudrate = 115200);
+
+    /**
+     * @brief 析构函数
+     */
+    ~SerialTransport() override;
+
+    /**
+     * @brief 连接到串口（使用构造时设置的参数）
+     * @return true 连接成功
+     * @return false 连接失败
+     */
+    bool connect() override;
+
+    /**
+     * @brief 连接到指定串口
+     * @param port 串口设备路径
+     * @param baudrate 波特率
+     * @return true 连接成功
+     * @return false 连接失败
+     */
+    bool connect(const std::string& port, int baudrate);
+
+    /**
+     * @brief 断开串口连接
+     */
+    void disconnect() override;
+
+    /**
+     * @brief 检查是否已连接
+     * @return true 已连接
+     * @return false 未连接
+     */
+    bool isConnected() const override;
+
+    /**
+     * @brief 写入数据
+     * @param data 数据缓冲区
+     * @param size 数据大小
+     * @return true表示成功
+     */
+    bool write(const uint8_t* data, size_t size) override;
+
+    /**
+     * @brief 读取数据
+     * @param buffer 数据缓冲区
+     * @param size 缓冲区大小
+     * @return 实际读取的字节数
+     */
+    size_t read(uint8_t* buffer, size_t size) override;
+
+    /**
+     * @brief 设置数据接收回调函数
+     * @param callback 回调函数，参数为接收到的数据和大小
+     */
+    void setReadCallback(std::function<void(const uint8_t*, size_t)> callback) override;
+
+    /**
+     * @brief 获取可用串口列表
+     * @return std::vector<std::string> 串口设备路径列表
+     */
+    static std::vector<std::string> availablePorts();
+
+    /**
+     * @brief 设置串口设备路径
+     * @param port 串口设备路径
+     */
+    void setPort(const std::string& port);
+
+    /**
+     * @brief 设置波特率
+     * @param baudrate 波特率
+     */
+    void setBaudRate(int baudrate);
+
+    /**
+     * @brief 获取串口设备路径
+     * @return std::string 串口设备路径
+     */
+    std::string getPort() const;
+
+    /**
+     * @brief 获取波特率
+     * @return int 波特率
+     */
+    int getBaudRate() const;
+
+    /**
+     * @brief 获取最后错误信息
+     * @return std::string 错误信息
+     */
+    std::string getLastError() const;
+
+    /**
+     * @brief 启动异步读取
+     *
+     * 在独立线程中循环读取数据，并通过回调函数通知上层。
+     * @return true 启动成功
+     * @return false 启动失败
+     */
+    bool startAsyncRead();
+
+    /**
+     * @brief 停止异步读取
+     */
+    void stopAsyncRead();
+
+    /**
+     * @brief 检查异步读取是否正在运行
+     * @return true 正在运行
+     * @return false 未运行
+     */
+    bool isAsyncReadRunning() const;
+
+private:
+    /**
+     * @brief 异步读取线程函数
+     */
+    void readThreadFunc();
+
+    /**
+     * @brief 配置串口参数
+     * @return true 配置成功
+     * @return false 配置失败
+     */
+    bool configurePort();
+
+    int fd_;                                                    ///< 文件描述符
+    std::string port_;                                          ///< 串口设备路径
+    int baudrate_;                                              ///< 波特率
+    std::atomic<bool> connected_;                               ///< 连接状态
+    std::atomic<bool> async_read_running_;                      ///< 异步读取线程运行状态
+    std::thread read_thread_;                                   ///< 异步读取线程
+    std::function<void(const uint8_t*, size_t)> read_callback_; ///< 数据接收回调
+    mutable std::mutex error_mutex_;                            ///< 错误信息互斥锁
+    std::string last_error_;                                    ///< 最后错误信息
+};
+
+} // namespace mcu_comm
+
+#endif // MCU_COMM_TRANSPORT_SERIAL_TRANSPORT_HPP

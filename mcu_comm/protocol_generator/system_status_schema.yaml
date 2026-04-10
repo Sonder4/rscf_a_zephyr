@@ -1,0 +1,100 @@
+enum_source: control_plane_enums.yaml
+
+fields:
+  - name: init_done
+    bits: 1
+    sync_direction: mcu_to_pc
+    apply_mode: passive
+    description: 初始化完成标志
+
+  - name: odom_ok
+    bits: 1
+    sync_direction: mcu_to_pc
+    apply_mode: passive
+    description: odom 状态
+
+  - name: task_all_ok
+    bits: 1
+    sync_direction: mcu_to_pc
+    apply_mode: passive
+    description: 任务运行状态
+
+  - name: peer_mcu_comm_ok
+    bits: 1
+    sync_direction: mcu_to_pc
+    apply_mode: passive
+    description: 多 MCU 通信状态
+
+  - name: imu_state
+    enum: ImuState
+    sync_direction: mcu_to_pc
+    apply_mode: passive
+    description: IMU 状态
+
+  - name: ctrl_mode
+    enum: ChassisCtrlMode
+    sync_direction: mcu_to_pc
+    apply_mode: passive
+    description: 当前底盘控制模式
+
+  - name: heading_mode
+    enum: HeadingMode
+    sync_direction: mcu_to_pc
+    apply_mode: passive
+    description: 当前车头控制模式
+
+  - name: velocity_frame
+    enum: VelocityFrame
+    sync_direction: mcu_to_pc
+    apply_mode: passive
+    description: 当前速度参考系
+
+  - name: service_id
+    enum: ServiceId
+    align_to_byte: true
+    sync_direction: mcu_to_pc
+    apply_mode: passive
+    description: 服务回显标识
+
+  - name: service_result
+    enum: ServiceResult
+    sync_direction: mcu_to_pc
+    apply_mode: passive
+    description: 服务执行结果
+
+  - name: service_ticket
+    bits: 2
+    sync_direction: mcu_to_pc
+    apply_mode: passive
+    description: 服务票据回显
+
+  - name: action_id
+    enum: ActionId
+    align_to_byte: true
+    sync_direction: mcu_to_pc
+    apply_mode: passive
+    description: 当前动作标识
+
+  - name: action_state
+    enum: ActionState
+    sync_direction: mcu_to_pc
+    apply_mode: passive
+    description: 当前动作状态
+
+  - name: action_ticket
+    bits: 2
+    sync_direction: mcu_to_pc
+    apply_mode: passive
+    description: 动作票据回显
+
+  - name: action_result
+    enum: ActionResult
+    sync_direction: mcu_to_pc
+    apply_mode: passive
+    description: 动作结果
+
+  - name: action_progress
+    bits: 6
+    sync_direction: mcu_to_pc
+    apply_mode: passive
+    description: 当前 action 阶段码

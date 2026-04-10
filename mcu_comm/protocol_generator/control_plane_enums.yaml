@@ -1,0 +1,184 @@
+meta:
+  ticket_bits: 2
+  action_progress_bits: 6
+
+enums:
+  ImuState:
+    description: IMU 状态
+    values:
+      0: DISABLED
+      1: OK
+      2: FAULT
+
+  ChassisCtrlMode:
+    description: 底盘控制模式
+    values:
+      0: RELAX
+      1: MANUAL
+      2: CMD_VEL
+      3: BRAKE_STOP
+
+  HeadingMode:
+    description: 车头控制模式
+    values:
+      0: DISABLED
+      1: LOCK_ZERO
+      2: TARGET_HEADING
+      3: FOLLOW_TARGET
+
+  VelocityFrame:
+    description: 速度参考系
+    values:
+      0: WORLD
+      1: BODY
+
+  ServiceId:
+    description: 轻量服务标识
+    values:
+      0: NONE
+      1: SET_CTRL_MODE
+      2: SET_HEADING_MODE
+      3: SET_VELOCITY_FRAME
+
+  ServiceResult:
+    description: 轻量服务执行结果
+    values:
+      0: NONE
+      1: OK
+      2: REJECT
+      3: ERROR
+
+  ActionId:
+    description: 轻量动作标识
+    values:
+      0: NONE
+      1: STEP_TRANSITION
+      2: ACQUIRE_KFS
+      3: PLACE_KFS
+
+  ActionCmd:
+    description: 轻量动作控制命令
+    values:
+      0: START
+      1: CANCEL
+      2: QUERY
+      3: RESERVED
+
+  ActionState:
+    description: 轻量动作执行状态
+    values:
+      0: IDLE
+      1: ACCEPTED
+      2: RUNNING
+      3: CANCELING
+      4: SUCCEEDED
+      5: CANCELED
+      6: ABORTED
+      7: REJECTED
+
+  ActionResult:
+    description: 轻量动作最终结果
+    values:
+      0: NONE
+      1: OK
+      2: FAIL
+      3: TIMEOUT
+
+  StepTransitionGoal:
+    description: 上下台阶目标
+    values:
+      0: UP_STEP
+      1: DOWN_STEP
+
+  StepTransitionTaskState:
+    description: 上下台阶动作阶段
+    values:
+      0: IDLE
+      1: UP_STEP
+      2: DOWN_STEP
+      3: UP_STEP_DONE
+      4: DOWN_STEP_DONE
+
+  AcquireKfsGoal:
+    description: 取 KFS 目标位置
+    values:
+      0: PLUS_20CM
+      1: MINUS_20CM
+      2: PLUS_40CM
+
+  AcquireKfsTaskState:
+    description: 取 KFS 动作阶段
+    values:
+      0: IDLE
+      1: STARTED
+      2: APPROACHING
+      3: ACQUIRING
+      4: ACQUIRE_SUCCESS
+      5: ACQUIRE_FAIL
+      6: PLACING
+      7: PLACE_SUCCESS
+      8: PLACE_FAIL
+      9: TASK_DONE
+      10: TASK_FAIL
+
+  PlaceKfsGoal:
+    description: 放置 KFS 动作命令
+    values:
+      0: PICK_KFS
+      1: OPEN_SUCTION
+      2: CLOSE_SUCTION
+      3: LIFT_KFS
+
+  PlaceKfsTaskState:
+    description: 放置 KFS 动作阶段
+    values:
+      0: IDLE
+      1: PICKING_KFS
+      2: ACQUIRE_SUCCESS
+      3: ACQUIRE_FAIL
+      4: PLACING
+      5: PLACE_SUCCESS
+      6: PLACE_FAIL
+      7: OPEN_SUCTION
+      8: CLOSE_SUCTION
+
+services:
+  - name: set_ctrl_mode
+    enum_entry: SET_CTRL_MODE
+    request_field_name: ctrl_mode
+    request_description: 设置底盘控制模式
+    request_enum: ChassisCtrlMode
+
+  - name: set_heading_mode
+    enum_entry: SET_HEADING_MODE
+    request_field_name: heading_mode
+    request_description: 设置车头控制模式
+    request_enum: HeadingMode
+
+  - name: set_velocity_frame
+    enum_entry: SET_VELOCITY_FRAME
+    request_field_name: velocity_frame
+    request_description: 设置速度参考系
+    request_enum: VelocityFrame
+
+actions:
+  - name: step_transition
+    enum_entry: STEP_TRANSITION
+    goal_field_name: target
+    goal_description: 上下台阶目标
+    goal_enum: StepTransitionGoal
+    feedback_state_enum: StepTransitionTaskState
+
+  - name: acquire_kfs
+    enum_entry: ACQUIRE_KFS
+    goal_field_name: target
+    goal_description: 取 KFS 目标位置
+    goal_enum: AcquireKfsGoal
+    feedback_state_enum: AcquireKfsTaskState
+
+  - name: place_kfs
+    enum_entry: PLACE_KFS
+    goal_field_name: command
+    goal_description: 放置 KFS 动作命令
+    goal_enum: PlaceKfsGoal
+    feedback_state_enum: PlaceKfsTaskState

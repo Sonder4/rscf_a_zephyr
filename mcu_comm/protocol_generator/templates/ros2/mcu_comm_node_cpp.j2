@@ -1,0 +1,1285 @@
+/**
+ * @file mcu_comm_node.cpp
+ * @brief MCU通信ROS2节点实现
+ * 
+ * 该文件由代码生成器自动生成，请勿手动修改。
+ * 协议版本: 2.0.0
+ */
+
+#include "node/mcu_comm_node.hpp"
+#include <chrono>
+#include <algorithm>
+#include <cmath>
+#include <sstream>
+#include <iomanip>
+#include <cstring>
+
+namespace mcu_comm
+{
+
+#ifndef MCU_COMM_DEBUG_TRACE
+#define MCU_COMM_DEBUG_TRACE 0
+#endif
+
+namespace {
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+uint32_t g_rx_count_{{ packet.name | to_snake_case }} = 0;
+{% endif %}
+{% endfor %}
+uint32_t g_tx_count_system_cmd = 0;
+
+{% if system_status_packet is not none or system_cmd_packet is not none %}
+uint8_t ExtractControlPlaneBits(const uint8_t *bytes, uint16_t bit_offset, uint8_t bit_width)
+{
+    uint8_t value = 0;
+
+    for (uint8_t index = 0; index < bit_width; ++index) {
+        const uint16_t absolute_bit = static_cast<uint16_t>(bit_offset + index);
+        const uint8_t byte_index = static_cast<uint8_t>(absolute_bit / 8U);
+        const uint8_t inner_bit = static_cast<uint8_t>(absolute_bit % 8U);
+        const uint8_t bit_value = static_cast<uint8_t>((bytes[byte_index] >> inner_bit) & 0x01U);
+        value = static_cast<uint8_t>(value | static_cast<uint8_t>(bit_value << index));
+    }
+
+    return value;
+}
+
+void InsertControlPlaneBits(uint8_t *bytes, uint16_t bit_offset, uint8_t bit_width, uint8_t value)
+{
+    for (uint8_t index = 0; index < bit_width; ++index) {
+        const uint16_t absolute_bit = static_cast<uint16_t>(bit_offset + index);
+        const uint8_t byte_index = static_cast<uint8_t>(absolute_bit / 8U);
+        const uint8_t inner_bit = static_cast<uint8_t>(absolute_bit % 8U);
+        const uint8_t mask = static_cast<uint8_t>(0x01U << inner_bit);
+        if (((value >> index) & 0x01U) != 0U) {
+            bytes[byte_index] = static_cast<uint8_t>(bytes[byte_index] | mask);
+        } else {
+            bytes[byte_index] = static_cast<uint8_t>(bytes[byte_index] & static_cast<uint8_t>(~mask));
+        }
+    }
+}
+
+bool IsTerminalActionState(uint8_t action_state)
+{
+    return (action_state == msg::SystemStatus::ACTION_STATE_SUCCEEDED) ||
+           (action_state == msg::SystemStatus::ACTION_STATE_CANCELED) ||
+           (action_state == msg::SystemStatus::ACTION_STATE_ABORTED) ||
+           (action_state == msg::SystemStatus::ACTION_STATE_REJECTED);
+}
+
+bool IsControlPlaneServiceArgInRange(uint8_t service_id, uint8_t service_arg)
+{
+    switch (service_id) {
+{% for service in control_plane.services %}
+{% if service.request_enum_entries is defined and service.request_enum_entries %}
+    case msg::SystemStatus::SERVICE_ID_{{ service.enum_entry }}:
+        return service_arg <= static_cast<uint8_t>({{ service.request_enum_entries[-1].value }});
+{% endif %}
+{% endfor %}
+    default:
+        return false;
+    }
+}
+
+rclcpp::QoS MakeReliableVolatileQos(size_t depth)
+{
+    return rclcpp::QoS(rclcpp::KeepLast(depth)).reliable().durability_volatile();
+}
+{% endif %}
+}
+
+McuCommNode::McuCommNode(const rclcpp::NodeOptions& options)
+: Node("mcu_comm_node", options)
+{
+    // 初始化参数
+    initializeParameters();
+
+    // 初始化发布者和订阅者
+    initializePublishersSubscribers();
+
+    // 初始化定时器
+    initializeTimers();
+
+    // 初始化通信组件
+    initializeCommunication();
+
+    RCLCPP_INFO(this->get_logger(), "MCU Communication Node initialized");
+}
+
+McuCommNode::~McuCommNode()
+{
+    shutting_down_ = true;
+    should_reconnect_ = false;
+    stopReconnectTimer();
+
+    // 停止通信管理器
+    if (comm_manager_) {
+        comm_manager_->stop();
+        RCLCPP_INFO(get_logger(), "Communication manager stopped");
+    }
+
+    RCLCPP_INFO(this->get_logger(), "MCU Communication Node destroyed");
+}
+
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+void McuCommNode::register{{ packet.name | to_upper_snake }}Callback(const {{ packet.name | to_upper_snake }}Callback& callback)
+{
+    std::lock_guard<std::mutex> lock({{ packet.name | to_snake_case }}_callbacks_mutex_);
+    {{ packet.name | to_snake_case }}_callbacks_.push_back(callback);
+}
+
+void McuCommNode::unregister{{ packet.name | to_upper_snake }}Callbacks()
+{
+    std::lock_guard<std::mutex> lock({{ packet.name | to_snake_case }}_callbacks_mutex_);
+    {{ packet.name | to_snake_case }}_callbacks_.clear();
+}
+
+{% if packet.name == 'CHASSIS_FEEDBACK' %}
+void McuCommNode::invoke{{ packet.name | to_upper_snake }}Callbacks(const nav_msgs::msg::Odometry& data)
+{% elif packet.name == 'IMU_EULER' %}
+void McuCommNode::invoke{{ packet.name | to_upper_snake }}Callbacks(const sensor_msgs::msg::Imu& data)
+{% else %}
+void McuCommNode::invoke{{ packet.name | to_upper_snake }}Callbacks(const msg::{{ packet.name | to_pascal_case }}& data)
+{% endif %}
+{
+    std::lock_guard<std::mutex> lock({{ packet.name | to_snake_case }}_callbacks_mutex_);
+    for (const auto& callback : {{ packet.name | to_snake_case }}_callbacks_) {
+        if (callback) {
+            callback(data);
+        }
+    }
+}
+
+{% endif %}
+{% endfor %}
+
+
+void McuCommNode::initializeParameters()
+{
+    // 声明参数
+    this->declare_parameter("transport_type", "tcp");
+    this->declare_parameter("fallback_transport_type", "serial");
+    this->declare_parameter("port_name", "/dev/ttyACM1");
+    this->declare_parameter("baud_rate", 115200);
+    this->declare_parameter("tcp_host", "192.168.1.10");
+    this->declare_parameter("tcp_port", 8899);
+    this->declare_parameter("tcp_timeout_ms", 1000);
+    this->declare_parameter("tcp_no_delay", true);
+    this->declare_parameter("can_device_path", "/dev/ttyACM1");
+    this->declare_parameter("can_channel", 1);
+    this->declare_parameter("can_tx_id", 0x301);
+    this->declare_parameter("can_rx_id", 0x302);
+    this->declare_parameter("can_read_timeout_us", 10000);
+    this->declare_parameter("timeout_ms", 1000);
+    this->declare_parameter("device_mid", 3);
+    this->declare_parameter("auto_reconnect", true);
+    this->declare_parameter("reconnect_interval_ms", 2000);
+    this->declare_parameter("debug_enabled", false);
+    this->declare_parameter("imu_frame_id", "imu_link");
+    this->declare_parameter("odom_frame_id", "odom");
+    this->declare_parameter("child_frame_id", "base_link");
+    this->declare_parameter("status_publish_rate", 1.0);
+    this->declare_parameter("heartbeat_rate", 1.0);
+    this->declare_parameter("cmd_send_rate", {{ protocol.link_rate_hz.pc_to_mcu if protocol.link_rate_hz is defined and protocol.link_rate_hz.pc_to_mcu is defined else 100.0 }});
+
+    // 获取参数值
+    transport_type_ = this->get_parameter("transport_type").as_string();
+    fallback_transport_type_ = this->get_parameter("fallback_transport_type").as_string();
+    port_name_ = this->get_parameter("port_name").as_string();
+    baud_rate_ = this->get_parameter("baud_rate").as_int();
+    tcp_host_ = this->get_parameter("tcp_host").as_string();
+    tcp_port_ = this->get_parameter("tcp_port").as_int();
+    tcp_timeout_ms_ = this->get_parameter("tcp_timeout_ms").as_int();
+    tcp_no_delay_ = this->get_parameter("tcp_no_delay").as_bool();
+    can_device_path_ = this->get_parameter("can_device_path").as_string();
+    can_channel_ = this->get_parameter("can_channel").as_int();
+    can_tx_id_ = this->get_parameter("can_tx_id").as_int();
+    can_rx_id_ = this->get_parameter("can_rx_id").as_int();
+    can_read_timeout_us_ = this->get_parameter("can_read_timeout_us").as_int();
+    timeout_ms_ = this->get_parameter("timeout_ms").as_int();
+    device_mid_ = this->get_parameter("device_mid").as_int();
+    auto_reconnect_ = this->get_parameter("auto_reconnect").as_bool();
+    reconnect_interval_ms_ = this->get_parameter("reconnect_interval_ms").as_int();
+    debug_enabled_ = this->get_parameter("debug_enabled").as_bool();
+    imu_frame_id_ = this->get_parameter("imu_frame_id").as_string();
+    odom_frame_id_ = this->get_parameter("odom_frame_id").as_string();
+    child_frame_id_ = this->get_parameter("child_frame_id").as_string();
+    status_publish_rate_ = this->get_parameter("status_publish_rate").as_double();
+    heartbeat_rate_ = this->get_parameter("heartbeat_rate").as_double();
+    cmd_send_rate_ = this->get_parameter("cmd_send_rate").as_double();
+
+    RCLCPP_INFO(this->get_logger(),
+                "Parameters loaded: transport=%s fallback=%s serial=%s@%d tcp=%s:%d can_dev=%s can_ch=%d can_tx=0x%X can_rx=0x%X",
+                transport_type_.c_str(),
+                fallback_transport_type_.c_str(),
+                port_name_.c_str(),
+                baud_rate_,
+                tcp_host_.c_str(),
+                tcp_port_,
+                can_device_path_.c_str(),
+                can_channel_,
+                can_tx_id_,
+                can_rx_id_);
+
+    RCLCPP_INFO(this->get_logger(), "MCU binding: device_mid=0x%02X", device_mid_);
+}
+
+bool McuCommNode::isPacketEnabledForCurrentDevice(PacketID pid) const
+{
+    switch (pid)
+    {
+{% for packet in packets %}
+    case PacketID::{{ packet.name | to_upper_snake }}:
+        return {% if packet.mid %}{% for mid in packet.mid %}(device_mid_ == {{ mid | hex_to_int }}){% if not loop.last %} || {% endif %}{% endfor %}{% else %}true{% endif %};
+{% endfor %}
+    default:
+        return false;
+    }
+}
+
+void McuCommNode::initializeCommunication()
+{
+    // 创建协议解析器
+    parser_ = std::make_shared<ProtocolParser>();
+    const auto build_transport = [this](TransportType transport_type) -> std::shared_ptr<ITransport> {
+        if (transport_type == TransportType::Can) {
+            return std::make_shared<CanTransport>(
+                can_device_path_,
+                static_cast<uint8_t>(can_channel_),
+                static_cast<uint32_t>(can_tx_id_),
+                static_cast<uint32_t>(can_rx_id_),
+                can_read_timeout_us_);
+        }
+        if (transport_type == TransportType::Tcp) {
+            return std::make_shared<TcpTransport>(tcp_host_, tcp_port_, tcp_timeout_ms_, tcp_no_delay_);
+        }
+        return std::make_shared<SerialTransport>(port_name_, baud_rate_);
+    };
+
+    const auto configure_comm_manager = [this](const std::shared_ptr<ITransport>& transport) -> bool {
+        transport_ = transport;
+        comm_manager_ = std::make_shared<CommManager>(transport_, parser_);
+        comm_manager_->registerConnectionCallback(
+            [this](bool connected) { this->onConnectionStatusChanged(connected); });
+
+    // 注册数据包回调（小端序，直接按结构体拷贝）
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+    if (isPacketEnabledForCurrentDevice(PacketID::{{ packet.name | to_upper_snake }})) {
+    comm_manager_->registerCallback(
+        PacketID::{{ packet.name | to_upper_snake }},
+        [this](const std::vector<uint8_t>& data) {
+            if (data.size() < sizeof({{ packet.name | to_upper_snake }}_t)) {
+                RCLCPP_WARN(this->get_logger(),
+                            "{{ packet.name | to_upper_snake }} payload too short: %zu < %zu",
+                            data.size(),
+                            sizeof({{ packet.name | to_upper_snake }}_t));
+                return;
+            }
+            {{ packet.name | to_upper_snake }}_t parsed_data{};
+            std::memcpy(&parsed_data, data.data(), sizeof({{ packet.name | to_upper_snake }}_t));
+            this->on{{ packet.name | to_pascal_case }}(parsed_data);
+        });
+    }
+{% endif %}
+{% endfor %}
+
+        return comm_manager_->initialize() && comm_manager_->start();
+    };
+
+    const TransportType requested_transport = ParseTransportType(transport_type_);
+    const TransportType fallback_transport = ParseTransportType(fallback_transport_type_);
+
+    bool started = configure_comm_manager(build_transport(requested_transport));
+    if (!started && (fallback_transport != requested_transport)) {
+        started = configure_comm_manager(build_transport(fallback_transport));
+        if (started) {
+            transport_type_ = TransportTypeToString(fallback_transport);
+        }
+    }
+
+    should_reconnect_ = auto_reconnect_ && !connected_.load();
+}
+
+void McuCommNode::initializePublishersSubscribers()
+{
+    const auto topic_qos = MakeReliableVolatileQos(10U);
+    const auto cmd_vel_qos = MakeReliableVolatileQos(100U);
+
+    // 创建发布者（使用JSON中定义的话题名称）
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+    if (isPacketEnabledForCurrentDevice(PacketID::{{ packet.name | to_upper_snake }})
+        {% if packet.suppress_topic_publish %}&& false{% endif %}) {
+{% if packet.name == 'CHASSIS_FEEDBACK' %}
+        {{ packet.name | to_snake_case }}_publisher_ = create_publisher<nav_msgs::msg::Odometry>(
+            "{{ packet.ros_topic if packet.ros_topic is defined else '/odom' }}", topic_qos);
+{% elif packet.name == 'IMU_EULER' %}
+        {{ packet.name | to_snake_case }}_publisher_ = create_publisher<sensor_msgs::msg::Imu>(
+            "{{ packet.ros_topic if packet.ros_topic is defined else '/imu/data' }}", topic_qos);
+{% else %}
+        {{ packet.name | to_snake_case }}_publisher_ = create_publisher<msg::{{ packet.name | to_pascal_case }}>(
+            "{{ packet.ros_topic if packet.ros_topic is defined else ('~/' + (packet.name | to_snake_case)) }}", topic_qos);
+{% endif %}
+    }
+{% endif %}
+{% endfor %}
+
+    status_publisher_ = create_publisher<std_msgs::msg::Header>("~/status", topic_qos);
+
+    // 创建订阅者
+    if (isPacketEnabledForCurrentDevice(PacketID::CHASSIS_CTRL)) {
+        cmd_vel_subscriber_ = this->create_subscription<geometry_msgs::msg::Twist>(
+            "cmd_vel", cmd_vel_qos,
+            [this](const geometry_msgs::msg::Twist::SharedPtr msg) {
+                this->onVelocityCommand(msg);
+            });
+        heading_target_subscriber_ = this->create_subscription<std_msgs::msg::Float32>(
+            "~/heading_target_deg", cmd_vel_qos,
+            [this](const std_msgs::msg::Float32::SharedPtr msg) {
+                this->onHeadingTarget(msg);
+            });
+    }
+{% for service in control_plane.services %}
+    {{ service.snake_name }}_service_ = this->create_service<srv::{{ service.pascal_name }}>(
+        "~/services/{{ service.snake_name }}",
+        [this](const std::shared_ptr<srv::{{ service.pascal_name }}::Request> request,
+               std::shared_ptr<srv::{{ service.pascal_name }}::Response> response) {
+            this->handle{{ service.pascal_name }}(request, response);
+        });
+{% endfor %}
+{% for action in control_plane.actions %}
+    {{ action.snake_name }}_action_server_ = rclcpp_action::create_server<action::{{ action.pascal_name }}>(
+        this,
+        "~/actions/{{ action.snake_name }}",
+        std::bind(&McuCommNode::handle{{ action.pascal_name }}Goal, this, std::placeholders::_1, std::placeholders::_2),
+        std::bind(&McuCommNode::handle{{ action.pascal_name }}Cancel, this, std::placeholders::_1),
+        std::bind(&McuCommNode::handle{{ action.pascal_name }}Accepted, this, std::placeholders::_1));
+{% endfor %}
+}
+
+void McuCommNode::initializeTimers()
+{
+    // 状态发布定时器
+    status_timer_ = this->create_wall_timer(
+        std::chrono::duration<double>(1.0 / status_publish_rate_),
+        [this]() { this->onStatusTimer(); });
+
+    if (isPacketEnabledForCurrentDevice(PacketID::CHASSIS_CTRL)) {
+        cmd_send_timer_ = this->create_wall_timer(
+            std::chrono::duration<double>(1.0 / cmd_send_rate_),
+            [this]() { this->onCommandSendTimer(); });
+    }
+
+    // 重连定时器（初始时未启动）
+    if (auto_reconnect_ && !connected_.load()) {
+        startReconnectTimer();
+    }
+}
+
+void McuCommNode::onConnectionStatusChanged(bool connected)
+{
+    std::lock_guard<std::mutex> lock(mutex_);
+    
+    bool was_connected = connected_.exchange(connected);
+
+    if (shutting_down_) {
+        return;
+    }
+    
+    if (connected && !was_connected) {
+        RCLCPP_INFO(this->get_logger(), "Connected to MCU");
+        should_reconnect_ = false;
+        stopReconnectTimer();
+    } else if (!connected && was_connected) {
+        RCLCPP_WARN(this->get_logger(), "Disconnected from MCU");
+        if (auto_reconnect_) {
+            should_reconnect_ = true;
+            startReconnectTimer();
+        }
+    }
+}
+
+void McuCommNode::onError(const std::string& error)
+{
+    RCLCPP_ERROR(this->get_logger(), "Communication error: %s", error.c_str());
+}
+
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+void McuCommNode::on{{ packet.name | to_pascal_case }}(const {{ packet.name | to_upper_snake }}_t& data)
+{
+#if MCU_COMM_DEBUG_TRACE
+    g_rx_count_{{ packet.name | to_snake_case }}++;
+#endif
+    if (debug_enabled_) {
+        RCLCPP_INFO(this->get_logger(),
+                    "[DEBUG] RX pid={{ packet.pid }} {{ packet.name | to_upper_snake }} count=%u",
+                    g_rx_count_{{ packet.name | to_snake_case }});
+    }
+
+{% if packet.name == 'CHASSIS_FEEDBACK' %}
+    nav_msgs::msg::Odometry ros_msg;
+    ros_msg.header.stamp = this->now();
+    ros_msg.header.frame_id = odom_frame_id_;
+    ros_msg.child_frame_id = child_frame_id_;
+    ros_msg.twist.twist.linear.x = data.vx_mps;
+    ros_msg.twist.twist.linear.y = data.vy_mps;
+    ros_msg.pose.pose.position.x = data.odom_x_mm / 1000.0;
+    ros_msg.pose.pose.position.y = data.odom_y_mm / 1000.0;
+
+    if ({{ packet.name | to_snake_case }}_publisher_) {
+        {{ packet.name | to_snake_case }}_publisher_->publish(ros_msg);
+    }
+    invoke{{ packet.name | to_upper_snake }}Callbacks(ros_msg);
+{% elif packet.name == 'IMU_EULER' %}
+    sensor_msgs::msg::Imu ros_msg;
+    ros_msg.header.stamp = this->now();
+    ros_msg.header.frame_id = imu_frame_id_;
+
+    constexpr double kDegToRad = 3.14159265358979323846 / 180.0;
+    const double roll_rad = static_cast<double>(data.roll) * kDegToRad;
+    const double pitch_rad = static_cast<double>(data.pitch) * kDegToRad;
+    const double yaw_rad = static_cast<double>(data.yaw) * kDegToRad;
+
+    const double half_roll = roll_rad * 0.5;
+    const double half_pitch = pitch_rad * 0.5;
+    const double half_yaw = yaw_rad * 0.5;
+
+    const double cr = std::cos(half_roll);
+    const double sr = std::sin(half_roll);
+    const double cp = std::cos(half_pitch);
+    const double sp = std::sin(half_pitch);
+    const double cy = std::cos(half_yaw);
+    const double sy = std::sin(half_yaw);
+
+    ros_msg.orientation.w = cr * cp * cy + sr * sp * sy;
+    ros_msg.orientation.x = sr * cp * cy - cr * sp * sy;
+    ros_msg.orientation.y = cr * sp * cy + sr * cp * sy;
+    ros_msg.orientation.z = cr * cp * sy - sr * sp * cy;
+
+    if ({{ packet.name | to_snake_case }}_publisher_) {
+        {{ packet.name | to_snake_case }}_publisher_->publish(ros_msg);
+    }
+    invoke{{ packet.name | to_upper_snake }}Callbacks(ros_msg);
+{% elif packet.name == 'SYSTEM_STATUS' %}
+    msg::SystemStatus ros_msg;
+    for (size_t index = 0; index < ros_msg.{{ system_status_packet.control_plane_bytes_field_name }}.size(); ++index) {
+        ros_msg.{{ system_status_packet.control_plane_bytes_field_name }}[index] = data.{{ system_status_packet.control_plane_bytes_field_name }}[index];
+    }
+{% for field in system_status_packet.control_plane_fields %}
+    ros_msg.{{ field.name }} = ExtractControlPlaneBits(
+        data.{{ system_status_packet.control_plane_bytes_field_name }},
+        SYSTEM_STATUS_{{ field.name | to_upper_snake }}_OFFSET,
+        SYSTEM_STATUS_{{ field.name | to_upper_snake }}_WIDTH);
+{% endfor %}
+
+    {
+        std::lock_guard<std::mutex> lock(control_plane_mutex_);
+        latest_system_status_ = ros_msg;
+        latest_system_status_valid_ = true;
+
+        if (pending_service_active_
+            && (ros_msg.service_id == pending_service_id_)
+            && (ros_msg.service_ticket == pending_service_ticket_)
+            && (ros_msg.service_result != msg::SystemStatus::SERVICE_RESULT_NONE)) {
+            pending_service_result_ = ros_msg.service_result;
+            pending_service_done_ = true;
+            pending_service_active_ = false;
+            control_plane_cv_.notify_all();
+            if (debug_enabled_) {
+                RCLCPP_INFO(this->get_logger(),
+                            "[DEBUG] service update id=%u ticket=%u result=%u",
+                            ros_msg.service_id,
+                            ros_msg.service_ticket,
+                            ros_msg.service_result);
+            }
+        }
+
+        if (action_active_
+            && (ros_msg.action_id == active_action_id_)
+            && (ros_msg.action_ticket == active_action_ticket_)) {
+            if (ros_msg.action_state >= msg::SystemStatus::ACTION_STATE_ACCEPTED) {
+                active_action_acknowledged_ = true;
+                control_plane_cv_.notify_all();
+            }
+            active_action_state_ = ros_msg.action_state;
+            active_action_result_ = ros_msg.action_result;
+            active_action_progress_ = ros_msg.action_progress;
+            if (debug_enabled_) {
+                RCLCPP_INFO(this->get_logger(),
+                            "[DEBUG] action state update id=%u ticket=%u state=%u result=%u progress=%u",
+                            ros_msg.action_id,
+                            ros_msg.action_ticket,
+                            ros_msg.action_state,
+                            ros_msg.action_result,
+                            ros_msg.action_progress);
+            }
+            publishActiveActionFeedback();
+            if (IsTerminalActionState(active_action_state_)) {
+                finalizeActiveAction();
+            }
+        }
+    }
+
+    if ({{ packet.name | to_snake_case }}_publisher_) {
+        {{ packet.name | to_snake_case }}_publisher_->publish(ros_msg);
+    }
+    invoke{{ packet.name | to_upper_snake }}Callbacks(ros_msg);
+{% else %}
+    msg::{{ packet.name | to_pascal_case }} ros_msg;
+{% for field in packet.data_fields %}
+    ros_msg.{{ field.name }} = data.{{ field.name }};
+{% endfor %}
+
+    if ({{ packet.name | to_snake_case }}_publisher_) {
+        {{ packet.name | to_snake_case }}_publisher_->publish(ros_msg);
+    }
+    invoke{{ packet.name | to_upper_snake }}Callbacks(ros_msg);
+{% endif %}
+}
+
+{% endif %}
+{% endfor %}
+
+void McuCommNode::onVelocityCommand(const geometry_msgs::msg::Twist::SharedPtr msg)
+{
+    if (!isPacketEnabledForCurrentDevice(PacketID::CHASSIS_CTRL) || (msg == nullptr)) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(cmd_vel_mutex_);
+    latest_cmd_vel_ = *msg;
+    latest_cmd_vel_valid_ = true;
+}
+
+void McuCommNode::onHeadingTarget(const std_msgs::msg::Float32::SharedPtr msg)
+{
+    if (!isPacketEnabledForCurrentDevice(PacketID::CHASSIS_CTRL) || (msg == nullptr)) {
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(cmd_vel_mutex_);
+    latest_heading_target_deg_ = msg->data;
+}
+
+void McuCommNode::onCommandSendTimer()
+{
+    geometry_msgs::msg::Twist cmd_msg;
+    float heading_target_deg = 0.0f;
+    std::vector<uint8_t> frame_data;
+
+    if (!isPacketEnabledForCurrentDevice(PacketID::CHASSIS_CTRL)) {
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(cmd_vel_mutex_);
+        if (!latest_cmd_vel_valid_) {
+            return;
+        }
+        cmd_msg = latest_cmd_vel_;
+        heading_target_deg = latest_heading_target_deg_;
+    }
+
+    if (!comm_manager_ || !comm_manager_->isConnected()) {
+        return;
+    }
+
+    if (buildVelocityCommandFrame(cmd_msg.linear.x, cmd_msg.linear.y, cmd_msg.angular.z,
+                                  heading_target_deg, frame_data)) {
+        (void)comm_manager_->sendFrame(PacketID::CHASSIS_CTRL, static_cast<DeviceID>(device_mid_), frame_data);
+    }
+}
+
+void McuCommNode::onStatusTimer()
+{
+    std_msgs::msg::Header status_msg;
+    status_msg.stamp = this->now();
+    status_msg.frame_id = connected_ ? "connected" : "disconnected";
+
+    status_publisher_->publish(status_msg);
+}
+
+void McuCommNode::onReconnectTimer()
+{
+    if (!should_reconnect_ || connected_) {
+        return;
+    }
+
+    RCLCPP_INFO(this->get_logger(), "Attempting to reconnect...");
+    attemptReconnect();
+}
+
+void McuCommNode::attemptReconnect()
+{
+    if (comm_manager_) {
+        comm_manager_->stop();
+        
+        // 重新初始化并启动
+        if (comm_manager_->initialize() && comm_manager_->start()) {
+            RCLCPP_INFO(this->get_logger(), "Reconnect transport restarted, waiting for MCU data");
+        } else {
+            RCLCPP_WARN(this->get_logger(), "Reconnection failed, will retry in %d ms", reconnect_interval_ms_);
+        }
+    }
+}
+
+void McuCommNode::startReconnectTimer()
+{
+    if (!reconnect_timer_) {
+        reconnect_timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(reconnect_interval_ms_),
+            [this]() { this->onReconnectTimer(); });
+    }
+}
+
+void McuCommNode::stopReconnectTimer()
+{
+    if (reconnect_timer_) {
+        reconnect_timer_->cancel();
+        reconnect_timer_.reset();
+    }
+}
+
+// 大端序数据解析辅助函数
+float McuCommNode::beToFloat(const std::vector<uint8_t>& data, size_t offset)
+{
+    if (offset + 3 >= data.size()) {
+        return 0.0f;
+    }
+    uint32_t beValue = (static_cast<uint32_t>(data[offset]) << 24) |
+                      (static_cast<uint32_t>(data[offset + 1]) << 16) |
+                      (static_cast<uint32_t>(data[offset + 2]) << 8) |
+                      static_cast<uint32_t>(data[offset + 3]);
+    float result;
+    std::memcpy(&result, &beValue, sizeof(float));
+    return result;
+}
+
+int16_t McuCommNode::beToInt16(const std::vector<uint8_t>& data, size_t offset)
+{
+    if (offset + 1 >= data.size()) {
+        return 0;
+    }
+    uint16_t beValue = (static_cast<uint16_t>(data[offset]) << 8) |
+                       static_cast<uint16_t>(data[offset + 1]);
+    return static_cast<int16_t>(beValue);
+}
+
+uint16_t McuCommNode::beToUint16(const std::vector<uint8_t>& data, size_t offset)
+{
+    if (offset + 1 >= data.size()) {
+        return 0;
+    }
+    return (static_cast<uint16_t>(data[offset]) << 8) |
+           static_cast<uint16_t>(data[offset + 1]);
+}
+
+int32_t McuCommNode::beToInt32(const std::vector<uint8_t>& data, size_t offset)
+{
+    if (offset + 3 >= data.size()) {
+        return 0;
+    }
+    uint32_t beValue = (static_cast<uint32_t>(data[offset]) << 24) |
+                      (static_cast<uint32_t>(data[offset + 1]) << 16) |
+                      (static_cast<uint32_t>(data[offset + 2]) << 8) |
+                      static_cast<uint32_t>(data[offset + 3]);
+    return static_cast<int32_t>(beValue);
+}
+
+uint32_t McuCommNode::beToUint32(const std::vector<uint8_t>& data, size_t offset)
+{
+    if (offset + 3 >= data.size()) {
+        return 0;
+    }
+    return (static_cast<uint32_t>(data[offset]) << 24) |
+           (static_cast<uint32_t>(data[offset + 1]) << 16) |
+           (static_cast<uint32_t>(data[offset + 2]) << 8) |
+           static_cast<uint32_t>(data[offset + 3]);
+}
+
+void McuCommNode::parseImuData(const std::vector<uint8_t>& data, sensor_msgs::msg::Imu& imu_msg)
+{
+    // 解析IMU欧拉角数据（大端序）
+    // 根据PL值计算有效数据长度，STM32基准：PL = 数据域长度（PID + LEN + DATA）
+    if (data.size() < 4) {
+        RCLCPP_WARN(this->get_logger(), "Invalid IMU data size: %zu", data.size());
+        return;
+    }
+    
+    // 从数据中提取PL值（第2个字节）
+    uint8_t pl = data[1];
+    
+    // 计算数据域起始偏移（SOF + PL = 2字节）
+    size_t data_offset = 2;
+    
+    // 计算有效数据长度
+    size_t payload_len = pl;
+    
+    // 检查数据是否足够（至少包含PID + LEN + 12字节IMU数据）
+    if (data.size() < data_offset + payload_len || payload_len < 14) {
+        RCLCPP_WARN(this->get_logger(), "Invalid IMU payload length: PL=%d, data_size=%zu", pl, data.size());
+        return;
+    }
+    
+    // 计算实际数据起始位置（跳过PID和LEN）
+    size_t field_offset = data_offset + 2;
+
+    // 解析roll, pitch, yaw（大端序float，各4字节）
+    float roll = beToFloat(data, field_offset);
+    float pitch = beToFloat(data, field_offset + 4);
+    float yaw = beToFloat(data, field_offset + 8);
+
+    if (debug_enabled_) {
+        RCLCPP_INFO(this->get_logger(), "IMU: roll=%.3f, pitch=%.3f, yaw=%.3f", roll, pitch, yaw);
+    }
+
+    // 设置消息头
+    imu_msg.header.stamp = this->now();
+    imu_msg.header.frame_id = imu_frame_id_;
+
+    // 欧拉角转四元数（ZYX顺序）
+    double cy = cos(yaw * 0.5);
+    double sy = sin(yaw * 0.5);
+    double cp = cos(pitch * 0.5);
+    double sp = sin(pitch * 0.5);
+    double cr = cos(roll * 0.5);
+    double sr = sin(roll * 0.5);
+
+    imu_msg.orientation.w = cr * cp * cy + sr * sp * sy;
+    imu_msg.orientation.x = sr * cp * cy - cr * sp * sy;
+    imu_msg.orientation.y = cr * sp * cy + sr * cp * sy;
+    imu_msg.orientation.z = cr * cp * sy - sr * sp * cy;
+
+    // 设置协方差矩阵
+    for (int i = 0; i < 9; i++) {
+        imu_msg.orientation_covariance[i] = 0.0;
+        imu_msg.angular_velocity_covariance[i] = 0.0;
+        imu_msg.linear_acceleration_covariance[i] = 0.0;
+    }
+    imu_msg.orientation_covariance[0] = 0.01;
+    imu_msg.orientation_covariance[4] = 0.01;
+    imu_msg.orientation_covariance[8] = 0.01;
+
+    // 没有角速度和线加速度数据，设置为NaN
+    imu_msg.angular_velocity.x = NAN;
+    imu_msg.angular_velocity.y = NAN;
+    imu_msg.angular_velocity.z = NAN;
+    imu_msg.linear_acceleration.x = NAN;
+    imu_msg.linear_acceleration.y = NAN;
+    imu_msg.linear_acceleration.z = NAN;
+}
+
+void McuCommNode::parseOdometryData(const std::vector<uint8_t>& data, nav_msgs::msg::Odometry& odom_msg)
+{
+    // 解析底盘反馈数据（大端序）
+    // 根据PL值计算有效数据长度，STM32基准：PL = 数据域长度（PID + LEN + DATA）
+    if (data.size() < 4) {
+        RCLCPP_WARN(this->get_logger(), "Invalid odometry data size: %zu", data.size());
+        return;
+    }
+    
+    // 从数据中提取PL值（第2个字节）
+    uint8_t pl = data[1];
+    
+    // 计算数据域起始偏移（SOF + PL = 2字节）
+    size_t data_offset = 2;
+    
+    // 计算有效数据长度
+    size_t payload_len = pl;
+    
+    // 检查数据是否足够（至少包含PID + LEN + 16字节里程计数据）
+    if (data.size() < data_offset + payload_len || payload_len < 18) {
+        RCLCPP_WARN(this->get_logger(), "Invalid odometry payload length: PL=%d, data_size=%zu", pl, data.size());
+        return;
+    }
+    
+    // 计算实际数据起始位置（跳过PID和LEN）
+    size_t field_offset = data_offset + 2;
+
+    // 解析vx, vy, odom_x, odom_y（大端序float，各4字节）
+    float vx = beToFloat(data, field_offset);
+    float vy = beToFloat(data, field_offset + 4);
+    float odom_x = beToFloat(data, field_offset + 8);
+    float odom_y = beToFloat(data, field_offset + 12);
+
+    if (debug_enabled_) {
+        RCLCPP_INFO(this->get_logger(), "Odometry: vx=%.3f, vy=%.3f, x=%.3f, y=%.3f", vx, vy, odom_x, odom_y);
+    }
+
+    // 设置消息头
+    odom_msg.header.stamp = this->now();
+    odom_msg.header.frame_id = odom_frame_id_;
+    odom_msg.child_frame_id = child_frame_id_;
+
+    // 设置位置（单位从mm转换为m）
+    odom_msg.pose.pose.position.x = odom_x / 1000.0;
+    odom_msg.pose.pose.position.y = odom_y / 1000.0;
+    odom_msg.pose.pose.position.z = 0.0;
+
+    // 设置方向（暂时设为单位四元数）
+    odom_msg.pose.pose.orientation.x = 0.0;
+    odom_msg.pose.pose.orientation.y = 0.0;
+    odom_msg.pose.pose.orientation.z = 0.0;
+    odom_msg.pose.pose.orientation.w = 1.0;
+
+    // 设置速度
+    odom_msg.twist.twist.linear.x = vx;
+    odom_msg.twist.twist.linear.y = vy;
+    odom_msg.twist.twist.linear.z = 0.0;
+    odom_msg.twist.twist.angular.x = 0.0;
+    odom_msg.twist.twist.angular.y = 0.0;
+    odom_msg.twist.twist.angular.z = 0.0;
+
+    // 设置协方差矩阵
+    for (int i = 0; i < 36; i++) {
+        odom_msg.pose.covariance[i] = 0.0;
+        odom_msg.twist.covariance[i] = 0.0;
+    }
+    odom_msg.pose.covariance[0] = 0.01;
+    odom_msg.pose.covariance[7] = 0.01;
+    odom_msg.pose.covariance[35] = 0.01;
+    odom_msg.twist.covariance[0] = 0.01;
+    odom_msg.twist.covariance[7] = 0.01;
+}
+
+bool McuCommNode::buildVelocityCommandFrame(float linear_x, float linear_y, float angular_z,
+                                            float heading_target_deg,
+                                            std::vector<uint8_t>& frame_data)
+{
+    float speed_mps = std::sqrt(linear_x * linear_x + linear_y * linear_y);
+    float direction_deg = std::atan2(linear_y, linear_x) * 180.0f / static_cast<float>(M_PI);
+    float yaw_rate_radps = angular_z;
+    float heading_deg = heading_target_deg;
+    int16_t heading_cdeg = 0;
+
+    const float LIMIT_V = 10.0f;
+    const float LIMIT_W = 10.0f;
+
+    speed_mps = std::min(std::max(speed_mps, -LIMIT_V), LIMIT_V);
+    direction_deg = std::min(std::max(direction_deg, -180.0f), 180.0f);
+    yaw_rate_radps = std::min(std::max(yaw_rate_radps, -LIMIT_W), LIMIT_W);
+    heading_deg = std::min(std::max(heading_deg, -180.0f), 180.0f);
+
+    const auto to_fixed_1000 = [](float val) -> int16_t {
+        return static_cast<int16_t>(std::lround(val * 1000.0f));
+    };
+    const auto to_fixed_100 = [](float val) -> int16_t {
+        return static_cast<int16_t>(std::lround(val * 100.0f));
+    };
+
+    heading_cdeg = to_fixed_100(heading_deg);
+
+    frame_data.resize(8U);
+
+    auto push_int16 = [&](int16_t val, int offset) {
+        std::memcpy(&frame_data[static_cast<size_t>(offset)], &val, sizeof(int16_t));
+    };
+
+    push_int16(to_fixed_1000(speed_mps), 0);
+    push_int16(to_fixed_100(direction_deg), 2);
+    push_int16(to_fixed_1000(yaw_rate_radps), 4);
+    push_int16(heading_cdeg, 6);
+
+    if (debug_enabled_) {
+        RCLCPP_INFO(this->get_logger(),
+            "Chassis CMD: speed=%.3f m/s dir=%.2f deg yaw_rate=%.3f rad/s heading_deg=%.2f heading_cdeg=%d",
+            speed_mps, direction_deg, yaw_rate_radps, heading_deg, heading_cdeg);
+    }
+
+    return true;
+}
+
+bool McuCommNode::buildSystemCmdFrame(const msg::SystemCmd& cmd_msg,
+                                      std::vector<uint8_t>& frame_data)
+{
+{% if system_cmd_packet is not none %}
+    SYSTEM_CMD_t data {};
+    for (size_t index = 0; index < {{ system_cmd_packet.control_plane_num_bytes }}U; ++index) {
+        data.{{ system_cmd_packet.control_plane_bytes_field_name }}[index] = cmd_msg.{{ system_cmd_packet.control_plane_bytes_field_name }}[index];
+    }
+
+{% for field in system_cmd_packet.control_plane_fields %}
+    InsertControlPlaneBits(
+        data.{{ system_cmd_packet.control_plane_bytes_field_name }},
+        SYSTEM_CMD_{{ field.name | to_upper_snake }}_OFFSET,
+        SYSTEM_CMD_{{ field.name | to_upper_snake }}_WIDTH,
+        static_cast<uint8_t>(cmd_msg.{{ field.name }}));
+{% endfor %}
+
+    frame_data.resize(sizeof(data));
+    std::memcpy(frame_data.data(), &data, sizeof(data));
+    return true;
+{% else %}
+    (void)cmd_msg;
+    frame_data.clear();
+    return false;
+{% endif %}
+}
+
+bool McuCommNode::sendSystemCmdFrame(const msg::SystemCmd& cmd_msg)
+{
+    std::vector<uint8_t> frame_data;
+
+    if (!isPacketEnabledForCurrentDevice(PacketID::SYSTEM_CMD)) {
+        return false;
+    }
+    if (!comm_manager_ || !comm_manager_->isConnected()) {
+        return false;
+    }
+    if (!buildSystemCmdFrame(cmd_msg, frame_data)) {
+        return false;
+    }
+
+    if (debug_enabled_) {
+        g_tx_count_system_cmd++;
+        RCLCPP_INFO(this->get_logger(),
+                    "[DEBUG] TX pid=0x09 SYSTEM_CMD count=%u",
+                    g_tx_count_system_cmd);
+    }
+    return comm_manager_->sendFrame(PacketID::SYSTEM_CMD, static_cast<DeviceID>(device_mid_), frame_data);
+}
+
+bool McuCommNode::sendServiceRequest(uint8_t service_id, uint8_t service_arg, uint8_t service_ticket)
+{
+    msg::SystemCmd cmd_msg;
+    for (size_t index = 0; index < cmd_msg.cmd_bytes.size(); ++index) {
+        cmd_msg.cmd_bytes[index] = 0U;
+    }
+    cmd_msg.service_id = service_id;
+    cmd_msg.service_arg = service_arg;
+    cmd_msg.service_ticket = service_ticket;
+    cmd_msg.action_id = msg::SystemCmd::ACTION_ID_NONE;
+    cmd_msg.action_cmd = msg::SystemCmd::ACTION_CMD_QUERY;
+    cmd_msg.action_ticket = 0U;
+    cmd_msg.action_param = 0U;
+    return sendSystemCmdFrame(cmd_msg);
+}
+
+bool McuCommNode::waitServiceResponse(uint8_t service_id, uint8_t service_ticket, uint8_t& service_result)
+{
+    std::unique_lock<std::mutex> lock(control_plane_mutex_);
+    const bool finished = control_plane_cv_.wait_for(
+        lock,
+        std::chrono::milliseconds(timeout_ms_),
+        [this, service_id, service_ticket]() {
+            return pending_service_done_
+                && (pending_service_id_ == service_id)
+                && (pending_service_ticket_ == service_ticket);
+        });
+    if (!finished) {
+        return false;
+    }
+    service_result = pending_service_result_;
+    pending_service_done_ = false;
+    return true;
+}
+
+bool McuCommNode::sendActionCommand(uint8_t action_id, uint8_t action_cmd, uint8_t action_ticket, uint8_t action_param)
+{
+    msg::SystemCmd cmd_msg;
+    for (size_t index = 0; index < cmd_msg.cmd_bytes.size(); ++index) {
+        cmd_msg.cmd_bytes[index] = 0U;
+    }
+    cmd_msg.service_id = msg::SystemCmd::SERVICE_ID_NONE;
+    cmd_msg.service_arg = 0U;
+    cmd_msg.service_ticket = 0U;
+    cmd_msg.action_id = action_id;
+    cmd_msg.action_cmd = action_cmd;
+    cmd_msg.action_ticket = action_ticket;
+    cmd_msg.action_param = action_param;
+    return sendSystemCmdFrame(cmd_msg);
+}
+
+bool McuCommNode::requestServiceWithRetry(uint8_t service_id, uint8_t service_arg, uint8_t service_ticket, uint8_t& service_result)
+{
+    uint8_t attempt = 0U;
+
+    /*
+     * 使用同一个 ticket 做有限次重发。
+     * MCU 侧对重复 ticket 只回显不重复执行，因此这里可以在丢包时安全重试。
+     */
+    for (attempt = 0U; attempt < kControlPlaneMaxRetryCount_; ++attempt)
+    {
+        {
+            std::lock_guard<std::mutex> lock(control_plane_mutex_);
+            pending_service_done_ = false;
+            pending_service_result_ = msg::SystemStatus::SERVICE_RESULT_NONE;
+        }
+
+        if (!sendServiceRequest(service_id, service_arg, service_ticket))
+        {
+            continue;
+        }
+
+        if (waitServiceResponse(service_id, service_ticket, service_result))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool McuCommNode::waitActionAck(uint8_t action_id, uint8_t action_ticket)
+{
+    std::unique_lock<std::mutex> lock(control_plane_mutex_);
+
+    return control_plane_cv_.wait_for(
+        lock,
+        std::chrono::milliseconds(timeout_ms_),
+        [this, action_id, action_ticket]() {
+            return action_active_
+                && active_action_acknowledged_
+                && (active_action_id_ == action_id)
+                && (active_action_ticket_ == action_ticket);
+        });
+}
+
+bool McuCommNode::startActionWithRetry(uint8_t action_id, uint8_t action_ticket, uint8_t action_param)
+{
+    uint8_t attempt = 0U;
+
+    /*
+     * action 启动以 MCU 回写的 ACCEPTED/RUNNING 为 ACK。
+     * 若状态包丢失，则使用同一 ticket 重发 START，请求 MCU 回显当前状态。
+     */
+    for (attempt = 0U; attempt < kControlPlaneMaxRetryCount_; ++attempt)
+    {
+        {
+            std::lock_guard<std::mutex> lock(control_plane_mutex_);
+            active_action_acknowledged_ = false;
+        }
+
+        if (!sendActionCommand(action_id,
+                               msg::SystemCmd::ACTION_CMD_START,
+                               action_ticket,
+                               action_param))
+        {
+            continue;
+        }
+
+        if (waitActionAck(action_id, action_ticket))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void McuCommNode::resetActiveActionState()
+{
+    action_active_ = false;
+    active_action_acknowledged_ = false;
+    active_action_id_ = msg::SystemStatus::ACTION_ID_NONE;
+    active_action_ticket_ = 0U;
+    active_action_state_ = msg::SystemStatus::ACTION_STATE_IDLE;
+    active_action_result_ = msg::SystemStatus::ACTION_RESULT_NONE;
+    active_action_progress_ = 0U;
+{% for action in control_plane.actions %}
+    {{ action.snake_name }}_goal_handle_.reset();
+{% endfor %}
+}
+
+void McuCommNode::publishActiveActionFeedback()
+{
+    if (!action_active_) {
+        return;
+    }
+{% for action in control_plane.actions %}
+    if ((active_action_id_ == msg::SystemStatus::ACTION_ID_{{ action.enum_entry }})
+        && {{ action.snake_name }}_goal_handle_) {
+        auto feedback = std::make_shared<action::{{ action.pascal_name }}::Feedback>();
+        feedback->action_id = active_action_id_;
+        feedback->action_state = active_action_state_;
+        feedback->action_ticket = active_action_ticket_;
+        feedback->action_result = active_action_result_;
+        feedback->task_state = active_action_progress_;
+        {{ action.snake_name }}_goal_handle_->publish_feedback(feedback);
+        return;
+    }
+{% endfor %}
+}
+
+void McuCommNode::finalizeActiveAction()
+{
+    if (!action_active_) {
+        return;
+    }
+{% for action in control_plane.actions %}
+    if ((active_action_id_ == msg::SystemStatus::ACTION_ID_{{ action.enum_entry }})
+        && {{ action.snake_name }}_goal_handle_) {
+        auto result = std::make_shared<action::{{ action.pascal_name }}::Result>();
+        result->action_id = active_action_id_;
+        result->action_state = active_action_state_;
+        result->action_ticket = active_action_ticket_;
+        result->action_result = active_action_result_;
+        result->task_state = active_action_progress_;
+
+        if (active_action_state_ == msg::SystemStatus::ACTION_STATE_SUCCEEDED) {
+            {{ action.snake_name }}_goal_handle_->succeed(result);
+        } else if (active_action_state_ == msg::SystemStatus::ACTION_STATE_CANCELED) {
+            {{ action.snake_name }}_goal_handle_->canceled(result);
+        } else {
+            {{ action.snake_name }}_goal_handle_->abort(result);
+        }
+        resetActiveActionState();
+        return;
+    }
+{% endfor %}
+    resetActiveActionState();
+}
+
+{% for service in control_plane.services %}
+void McuCommNode::handle{{ service.pascal_name }}(
+    const std::shared_ptr<srv::{{ service.pascal_name }}::Request> request,
+    std::shared_ptr<srv::{{ service.pascal_name }}::Response> response)
+{
+    uint8_t service_result = msg::SystemStatus::SERVICE_RESULT_ERROR;
+    uint8_t service_ticket = 0U;
+
+    if ((request == nullptr) || (response == nullptr)) {
+        return;
+    }
+
+    if (!IsControlPlaneServiceArgInRange(msg::SystemStatus::SERVICE_ID_{{ service.enum_entry }},
+                                         request->{{ service.request_field_name }})) {
+        response->service_id = msg::SystemStatus::SERVICE_ID_{{ service.enum_entry }};
+        response->service_result = msg::SystemStatus::SERVICE_RESULT_REJECT;
+        response->service_ticket = 0U;
+        return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(control_plane_mutex_);
+        if (pending_service_active_) {
+            response->service_id = msg::SystemStatus::SERVICE_ID_{{ service.enum_entry }};
+            response->service_result = msg::SystemStatus::SERVICE_RESULT_REJECT;
+            response->service_ticket = 0U;
+            return;
+        }
+        service_ticket = next_service_ticket_;
+        next_service_ticket_ = static_cast<uint8_t>((next_service_ticket_ + 1U) & 0x03U);
+        pending_service_active_ = true;
+        pending_service_done_ = false;
+        pending_service_id_ = msg::SystemStatus::SERVICE_ID_{{ service.enum_entry }};
+        pending_service_ticket_ = service_ticket;
+        pending_service_result_ = msg::SystemStatus::SERVICE_RESULT_NONE;
+    }
+
+    if (!requestServiceWithRetry(msg::SystemStatus::SERVICE_ID_{{ service.enum_entry }},
+                                 request->{{ service.request_field_name }},
+                                 service_ticket,
+                                 service_result)) {
+        std::lock_guard<std::mutex> lock(control_plane_mutex_);
+        pending_service_active_ = false;
+        pending_service_done_ = false;
+        pending_service_result_ = msg::SystemStatus::SERVICE_RESULT_ERROR;
+        response->service_id = msg::SystemStatus::SERVICE_ID_{{ service.enum_entry }};
+        response->service_result = msg::SystemStatus::SERVICE_RESULT_ERROR;
+        response->service_ticket = service_ticket;
+        return;
+    }
+    {
+        std::lock_guard<std::mutex> lock(control_plane_mutex_);
+        pending_service_active_ = false;
+    }
+
+    response->service_id = msg::SystemStatus::SERVICE_ID_{{ service.enum_entry }};
+    response->service_result = service_result;
+    response->service_ticket = service_ticket;
+}
+
+{% endfor %}
+{% for action in control_plane.actions %}
+rclcpp_action::GoalResponse McuCommNode::handle{{ action.pascal_name }}Goal(
+    const rclcpp_action::GoalUUID& uuid,
+    std::shared_ptr<const action::{{ action.pascal_name }}::Goal> goal)
+{
+    (void)uuid;
+    (void)goal;
+    std::lock_guard<std::mutex> lock(control_plane_mutex_);
+    if (action_active_) {
+        return rclcpp_action::GoalResponse::REJECT;
+    }
+    if (!comm_manager_ || !comm_manager_->isConnected()) {
+        return rclcpp_action::GoalResponse::REJECT;
+    }
+    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+}
+
+rclcpp_action::CancelResponse McuCommNode::handle{{ action.pascal_name }}Cancel(
+    const std::shared_ptr<{{ action.pascal_name }}GoalHandle> goal_handle)
+{
+    std::lock_guard<std::mutex> lock(control_plane_mutex_);
+    if (!action_active_ || ({{ action.snake_name }}_goal_handle_ != goal_handle)) {
+        return rclcpp_action::CancelResponse::REJECT;
+    }
+    if (!sendActionCommand(msg::SystemStatus::ACTION_ID_{{ action.enum_entry }},
+                           msg::SystemCmd::ACTION_CMD_CANCEL,
+                           active_action_ticket_,
+                           0U)) {
+        return rclcpp_action::CancelResponse::REJECT;
+    }
+    return rclcpp_action::CancelResponse::ACCEPT;
+}
+
+void McuCommNode::handle{{ action.pascal_name }}Accepted(
+    const std::shared_ptr<{{ action.pascal_name }}GoalHandle> goal_handle)
+{
+    uint8_t action_ticket = 0U;
+    uint8_t action_param = 0U;
+
+    if (goal_handle == nullptr) {
+        return;
+    }
+    action_param = goal_handle->get_goal()->{{ action.goal_field_name }};
+
+    {
+        std::lock_guard<std::mutex> lock(control_plane_mutex_);
+        if (action_active_) {
+            auto result = std::make_shared<action::{{ action.pascal_name }}::Result>();
+            result->action_id = msg::SystemStatus::ACTION_ID_{{ action.enum_entry }};
+            result->action_state = msg::SystemStatus::ACTION_STATE_REJECTED;
+            result->action_ticket = 0U;
+            result->action_result = msg::SystemStatus::ACTION_RESULT_FAIL;
+            result->task_state = 0U;
+            goal_handle->abort(result);
+            return;
+        }
+
+        action_ticket = next_action_ticket_;
+        next_action_ticket_ = static_cast<uint8_t>((next_action_ticket_ + 1U) & 0x03U);
+        action_active_ = true;
+        active_action_acknowledged_ = false;
+        active_action_id_ = msg::SystemStatus::ACTION_ID_{{ action.enum_entry }};
+        active_action_ticket_ = action_ticket;
+        active_action_state_ = msg::SystemStatus::ACTION_STATE_IDLE;
+        active_action_result_ = msg::SystemStatus::ACTION_RESULT_NONE;
+        active_action_progress_ = 0U;
+        {{ action.snake_name }}_goal_handle_ = goal_handle;
+    }
+
+    if (!startActionWithRetry(msg::SystemStatus::ACTION_ID_{{ action.enum_entry }},
+                              action_ticket,
+                              action_param)) {
+        std::lock_guard<std::mutex> lock(control_plane_mutex_);
+        auto result = std::make_shared<action::{{ action.pascal_name }}::Result>();
+        result->action_id = msg::SystemStatus::ACTION_ID_{{ action.enum_entry }};
+        result->action_state = msg::SystemStatus::ACTION_STATE_ABORTED;
+        result->action_ticket = action_ticket;
+        result->action_result = msg::SystemStatus::ACTION_RESULT_FAIL;
+        result->task_state = 0U;
+        goal_handle->abort(result);
+        resetActiveActionState();
+        return;
+    }
+}
+
+{% endfor %}
+
+} // namespace mcu_comm

@@ -8,6 +8,9 @@ properties:
   console-uart:
     type: phandle
     required: true
+  comm-uart:
+    type: phandle
+    required: true
   imu-uart:
     type: phandle
     required: true

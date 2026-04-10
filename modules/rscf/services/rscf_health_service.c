@@ -17,7 +17,7 @@ void RSCFHealthServiceBeat(void)
 {
   s_beat_count++;
 
-  if ((s_beat_count % 5U) == 0U) {
+  if ((s_beat_count % 500U) == 0U) {
     LOG_INF("health beat count=%u", s_beat_count);
   }
 }

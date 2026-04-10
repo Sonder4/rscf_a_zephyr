@@ -1,0 +1,333 @@
+/*******************************************************************************
+
+                      版权所有 (C), 2025-2026, NCU_Roboteam
+
+ *******************************************************************************
+  文 件 名: protocol.c
+  版 本 号: 1.0.0
+  作    者: Xuan
+  生成日期: 2026-02-11
+  功能描述: Zephyr 通信协议处理层源文件
+  补    充: 协议版本 2.0.0
+
+*******************************************************************************/
+
+#include "protocol.h"
+
+#include <string.h>
+
+#include "bsp_log.h"
+
+#ifndef MCU_COMM_DEBUG_TRACE
+#define MCU_COMM_DEBUG_TRACE 0
+#endif
+
+#if MCU_COMM_DEBUG_TRACE
+#define PROTOCOL_TRACE_INFO(format, ...) LOGINFO("[proto] " format, ##__VA_ARGS__)
+#define PROTOCOL_TRACE_WARN(format, ...) LOGWARNING("[proto] " format, ##__VA_ARGS__)
+#else
+#define PROTOCOL_TRACE_INFO(format, ...)
+#define PROTOCOL_TRACE_WARN(format, ...)
+#endif
+
+#define PROTOCOL_CRC_INIT_16 0xFFFFu
+
+static const uint16_t crc16_table[256] = {
+    0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
+    0x8108, 0x9129, 0xA14A, 0xB16B, 0xC18C, 0xD1AD, 0xE1CE, 0xF1EF,
+    0x1231, 0x0210, 0x3273, 0x2252, 0x52B5, 0x4294, 0x72F7, 0x62D6,
+    0x9339, 0x8318, 0xB37B, 0xA35A, 0xD3BD, 0xC39C, 0xF3FF, 0xE3DE,
+    0x2462, 0x3443, 0x0420, 0x1401, 0x64E6, 0x74C7, 0x44A4, 0x5485,
+    0xA56A, 0xB54B, 0x8528, 0x9509, 0xE5EE, 0xF5CF, 0xC5AC, 0xD58D,
+    0x3653, 0x2672, 0x1611, 0x0630, 0x76D7, 0x66F6, 0x5695, 0x46B4,
+    0xB75B, 0xA77A, 0x9719, 0x8738, 0xF7DF, 0xE7FE, 0xD79D, 0xC7BC,
+    0x48C4, 0x58E5, 0x6886, 0x78A7, 0x0840, 0x1861, 0x2802, 0x3823,
+    0xC9CC, 0xD9ED, 0xE98E, 0xF9AF, 0x8948, 0x9969, 0xA90A, 0xB92B,
+    0x5AF5, 0x4AD4, 0x7AB7, 0x6A96, 0x1A71, 0x0A50, 0x3A33, 0x2A12,
+    0xDBFD, 0xCBDC, 0xFBBF, 0xEB9E, 0x9B79, 0x8B58, 0xBB3B, 0xAB1A,
+    0x6CA6, 0x7C87, 0x4CE4, 0x5CC5, 0x2C22, 0x3C03, 0x0C60, 0x1C41,
+    0xEDAE, 0xFD8F, 0xCDEC, 0xDDCD, 0xAD2A, 0xBD0B, 0x8D68, 0x9D49,
+    0x7E97, 0x6EB6, 0x5ED5, 0x4EF4, 0x3E13, 0x2E32, 0x1E51, 0x0E70,
+    0xFF9F, 0xEFBE, 0xDFDD, 0xCFFC, 0xBF1B, 0xAF3A, 0x9F59, 0x8F78,
+    0x9188, 0x81A9, 0xB1CA, 0xA1EB, 0xD10C, 0xC12D, 0xF14E, 0xE16F,
+    0x1080, 0x00A1, 0x30C2, 0x20E3, 0x5004, 0x4025, 0x7046, 0x6067,
+    0x83B9, 0x9398, 0xA3FB, 0xB3DA, 0xC33D, 0xD31C, 0xE37F, 0xF35E,
+    0x02B1, 0x1290, 0x22F3, 0x32D2, 0x4235, 0x5214, 0x6277, 0x7256,
+    0xB5EA, 0xA5CB, 0x95A8, 0x8589, 0xF56E, 0xE54F, 0xD52C, 0xC50D,
+    0x34E2, 0x24C3, 0x14A0, 0x0481, 0x7466, 0x6447, 0x5424, 0x4405,
+    0xA7DB, 0xB7FA, 0x8799, 0x97B8, 0xE75F, 0xF77E, 0xC71D, 0xD73C,
+    0x26D3, 0x36F2, 0x0691, 0x16B0, 0x6657, 0x7676, 0x4615, 0x5634,
+    0xD94C, 0xC96D, 0xF90E, 0xE92F, 0x99C8, 0x89E9, 0xB98A, 0xA9AB,
+    0x5844, 0x4865, 0x7806, 0x6827, 0x18C0, 0x08E1, 0x3882, 0x28A3,
+    0xCB7D, 0xDB5C, 0xEB3F, 0xFB1E, 0x8BF9, 0x9BD8, 0xABBB, 0xBB9A,
+    0x4A75, 0x5A54, 0x6A37, 0x7A16, 0x0AF1, 0x1AD0, 0x2AB3, 0x3A92,
+    0xFD2E, 0xED0F, 0xDD6C, 0xCD4D, 0xBDAA, 0xAD8B, 0x9DE8, 0x8DC9,
+    0x7C26, 0x6C07, 0x5C64, 0x4C45, 0x3CA2, 0x2C83, 0x1CE0, 0x0CC1,
+    0xEF1F, 0xFF3E, 0xCF5D, 0xDF7C, 0xAF9B, 0xBFBA, 0x8FD9, 0x9FF8,
+    0x6E17, 0x7E36, 0x4E55, 0x5E74, 0x2E93, 0x3EB2, 0x0ED1, 0x1EF0
+};
+
+typedef enum
+{
+    STATE_WAIT_H1,
+    STATE_WAIT_H2,
+    STATE_WAIT_HEART,
+    STATE_WAIT_MID,
+    STATE_WAIT_PL,
+    STATE_WAIT_PID,
+    STATE_WAIT_LEN,
+    STATE_WAIT_DATA,
+    STATE_WAIT_CRC_H,
+    STATE_WAIT_CRC_L,
+    STATE_WAIT_TAIL
+} ProtocolState_t;
+
+static ProtocolState_t rx_state = STATE_WAIT_H1;
+static uint8_t rx_data_idx = 0;
+static uint8_t tx_heart = 0;
+static uint32_t s_crc_ok_count = 0;
+static uint32_t s_crc_fail_count = 0;
+static uint32_t s_packet_len_parsed_count = 0;
+static uint8_t* rx_data_ptr = NULL;
+static uint8_t  rx_expected_len = 0;
+static uint8_t ProtocolFrame_buffer[128];
+static uint8_t ProtocolPID_buffer[128];
+
+void ProtocolFrame_Init(ProtocolFrame_t* frame)
+{
+    frame->header1 = PROTOCOL_HEAD1;
+    frame->header2 = PROTOCOL_HEAD2;
+    frame->heart = 0;
+    frame->mid = 0;
+    frame->pl = 0;
+    frame->alldata_ptr = ProtocolFrame_buffer;
+    frame->pidData_ptr = ProtocolPID_buffer;
+    frame->crc = 0;
+    frame->crc_flag = 1;
+    frame->tail = PROTOCOL_TAIL;
+}
+
+static inline uint16_t crc16_byte(uint16_t crc, uint8_t byte)
+{
+    return (crc << 8) ^ crc16_table[((crc >> 8) ^ byte) & 0xFF];
+}
+
+static uint16_t Protocol_CRC16(const uint8_t* data, uint16_t len)
+{
+    uint16_t crc = PROTOCOL_CRC_INIT_16;
+
+    while (len--)
+    {
+        crc = crc16_byte(crc, *data++);
+    }
+
+    return crc;
+}
+
+uint16_t Protocol_Pack(uint8_t mid, uint8_t pid, const uint8_t* data, uint8_t len, uint8_t* out_buf)
+{
+    uint16_t idx = 0;
+    uint16_t crc;
+
+    out_buf[idx++] = PROTOCOL_HEAD1;
+    out_buf[idx++] = PROTOCOL_HEAD2;
+    out_buf[idx++] = tx_heart++;
+    out_buf[idx++] = mid;
+    out_buf[idx++] = 1 + 1 + len;
+    out_buf[idx++] = pid;
+    out_buf[idx++] = len;
+
+    if ((len > 0U) && (data != NULL))
+    {
+        memcpy(&out_buf[idx], data, len);
+        idx += len;
+    }
+
+    crc = Protocol_CRC16(&out_buf[5], (uint16_t)(1 + 1 + len));
+    out_buf[idx++] = (crc >> 8) & 0xFF;
+    out_buf[idx++] = crc & 0xFF;
+    out_buf[idx++] = PROTOCOL_TAIL;
+    return idx;
+}
+
+uint16_t Protocol_Pack_Begin(uint8_t mid, uint8_t* out_buf)
+{
+    uint16_t idx = 0;
+
+    out_buf[idx++] = PROTOCOL_HEAD1;
+    out_buf[idx++] = PROTOCOL_HEAD2;
+    out_buf[idx++] = tx_heart++;
+    out_buf[idx++] = mid;
+    out_buf[idx++] = 0;
+    return idx;
+}
+
+uint16_t Protocol_Pack_Add(uint8_t pid, const uint8_t* data, uint8_t len, uint8_t* out_buf, uint16_t current_idx)
+{
+    out_buf[current_idx++] = pid;
+    out_buf[current_idx++] = len;
+
+    if ((len > 0U) && (data != NULL))
+    {
+        memcpy(&out_buf[current_idx], data, len);
+        current_idx += len;
+    }
+
+    return current_idx;
+}
+
+uint16_t Protocol_Pack_End(uint8_t* out_buf, uint16_t current_idx)
+{
+    uint8_t pl_len = current_idx - 5U;
+    uint16_t crc;
+
+    out_buf[4] = pl_len;
+    crc = Protocol_CRC16(&out_buf[5], pl_len);
+    out_buf[current_idx++] = (crc >> 8) & 0xFF;
+    out_buf[current_idx++] = crc & 0xFF;
+    out_buf[current_idx++] = PROTOCOL_TAIL;
+    return current_idx;
+}
+
+int8_t Protocol_Unpack(uint8_t byte, ProtocolFrame_t* frame)
+{
+    static uint8_t idx = 0;
+    uint8_t status = 0;
+
+    switch (rx_state)
+    {
+    case STATE_WAIT_H1:
+        idx = 0;
+        if (byte == PROTOCOL_HEAD1)
+        {
+            frame->header1 = byte;
+            frame->pidLen = 0;
+            rx_state = STATE_WAIT_H2;
+        }
+        break;
+
+    case STATE_WAIT_H2:
+        if (byte == PROTOCOL_HEAD2)
+        {
+            frame->header2 = byte;
+            rx_state = STATE_WAIT_HEART;
+            status = 1;
+        }
+        else
+        {
+            rx_state = STATE_WAIT_H1;
+        }
+        break;
+
+    case STATE_WAIT_HEART:
+        frame->heart = byte;
+        rx_state = STATE_WAIT_MID;
+        break;
+
+    case STATE_WAIT_MID:
+        frame->mid = byte;
+        rx_state = STATE_WAIT_PL;
+        break;
+
+    case STATE_WAIT_PL:
+        frame->pl = byte;
+        idx = 0;
+        if (frame->pl == 0U)
+        {
+            rx_state = STATE_WAIT_CRC_H;
+        }
+        else
+        {
+            rx_data_idx = 0;
+            rx_state = STATE_WAIT_PID;
+        }
+        break;
+
+    case STATE_WAIT_PID:
+        frame->pid = byte;
+        frame->alldata_ptr[idx++] = byte;
+        rx_data_ptr = pid_registry[frame->pid].data_ptr;
+        rx_expected_len = pid_registry[frame->pid].data_len;
+        rx_state = STATE_WAIT_LEN;
+        break;
+
+    case STATE_WAIT_LEN:
+        frame->pidLen = byte;
+        frame->alldata_ptr[idx++] = byte;
+        s_packet_len_parsed_count++;
+        PROTOCOL_TRACE_INFO("RX pkt#%lu pid=0x%02X len=%u pl=%u mid=0x%02X",
+                            (unsigned long)s_packet_len_parsed_count,
+                            frame->pid,
+                            frame->pidLen,
+                            frame->pl,
+                            frame->mid);
+        if (frame->pidLen == 0U)
+        {
+            rx_state = (idx < frame->pl) ? STATE_WAIT_PID : STATE_WAIT_CRC_H;
+            return 2;
+        }
+        rx_data_idx = 0U;
+        rx_state = STATE_WAIT_DATA;
+        break;
+
+    case STATE_WAIT_DATA:
+        frame->alldata_ptr[idx++] = byte;
+        if (idx > frame->pl)
+        {
+            rx_state = STATE_WAIT_H1;
+            return -1;
+        }
+        if ((rx_data_ptr != NULL) && (rx_data_idx < rx_expected_len))
+        {
+            rx_data_ptr[rx_data_idx] = byte;
+        }
+        rx_data_idx++;
+        if (rx_data_idx == frame->pidLen)
+        {
+            rx_state = (idx < frame->pl) ? STATE_WAIT_PID : STATE_WAIT_CRC_H;
+            rx_data_ptr = NULL;
+            return 2;
+        }
+        break;
+
+    case STATE_WAIT_CRC_H:
+        frame->crc = (uint16_t)byte << 8;
+        rx_state = STATE_WAIT_CRC_L;
+        break;
+
+    case STATE_WAIT_CRC_L:
+        frame->crc |= byte;
+        rx_state = STATE_WAIT_TAIL;
+        break;
+
+    case STATE_WAIT_TAIL:
+        rx_state = STATE_WAIT_H1;
+        if (byte != PROTOCOL_TAIL)
+        {
+            PROTOCOL_TRACE_WARN("tail mismatch: 0x%02X", byte);
+            return -1;
+        }
+        if (frame->crc_flag == 1U)
+        {
+            uint16_t cal_crc = Protocol_CRC16(frame->alldata_ptr, frame->pl);
+            if (cal_crc != frame->crc)
+            {
+                s_crc_fail_count++;
+                PROTOCOL_TRACE_WARN("CRC reject #%lu pid=0x%02X calc=0x%04X recv=0x%04X",
+                                    (unsigned long)s_crc_fail_count,
+                                    frame->pid,
+                                    cal_crc,
+                                    frame->crc);
+                return -1;
+            }
+            s_crc_ok_count++;
+        }
+        return 3;
+
+    default:
+        rx_state = STATE_WAIT_H1;
+        break;
+    }
+
+    return status;
+}

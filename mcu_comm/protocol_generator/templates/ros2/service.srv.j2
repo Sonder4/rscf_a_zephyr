@@ -1,0 +1,10 @@
+{% if service.request_enum_entries is defined -%}
+{% for entry in service.request_enum_entries -%}
+uint8 {{ service.request_field_name | to_upper_snake }}_{{ entry.name | to_upper_snake }}={{ entry.value }}
+{% endfor -%}
+{% endif -%}
+uint8 {{ service.request_field_name }}  # {{ service.request_description }}
+---
+uint8 service_id  # 服务标识回显
+uint8 service_result  # 服务执行结果
+uint8 service_ticket  # 服务票据回显

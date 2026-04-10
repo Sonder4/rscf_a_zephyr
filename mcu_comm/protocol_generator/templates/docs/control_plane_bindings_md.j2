@@ -1,0 +1,13 @@
+# Control Plane Bindings
+
+## Service Definitions
+| Service | Enum Entry | Service ID | Request Field | Description |
+| --- | --- | --- | --- | --- |
+{% for service in control_plane.services %}| `{{ service.snake_name }}` | `{{ service.enum_entry }}` | `{{ service.id_value }}` | `{{ service.request_field_name }}` | {{ service.request_description }} |
+{% endfor %}
+
+## Action Definitions
+| Action | Enum Entry | Action ID | Goal Field | Feedback State Enum | Feedback Source |
+| --- | --- | --- | --- | --- | --- |
+{% for action in control_plane.actions %}| `{{ action.snake_name }}` | `{{ action.enum_entry }}` | `{{ action.id_value }}` | `{{ action.goal_field_name }}` | `{% if action.feedback_state_enum is defined %}{{ action.feedback_state_enum }}{% else %}-{% endif %}` | `SYSTEM_STATUS.action_progress` |
+{% endfor %}

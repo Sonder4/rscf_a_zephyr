@@ -5,6 +5,7 @@
 #include <rscf/rscf_debug_fault.h>
 #include <rscf/rscf_event_bus.h>
 #include <rscf/rscf_health_service.h>
+#include <rscf/rscf_motor_service.h>
 #include "rscf_buzzer.h"
 #include "rscf_comm_service.h"
 #include "rscf_dtof2510.h"
@@ -67,6 +68,13 @@ int RSCFAppProfileInit(void)
   }
 #endif
 
+#if defined(CONFIG_RSCF_MOTOR_SERVICE)
+  ret = RSCFMotorServiceInit();
+  if (ret != 0) {
+    return ret;
+  }
+#endif
+
 #if defined(CONFIG_RSCF_IMU_UART)
   ret = RSCFImuUartInit();
   if (ret != 0) {
@@ -101,6 +109,10 @@ void RSCFAppProfileTick(void)
 
 #if defined(CONFIG_RSCF_HEALTH_SERVICE)
   RSCFHealthServiceBeat();
+#endif
+
+#if defined(CONFIG_RSCF_COMM_SERVICE)
+  RSCFCommServiceProcess();
 #endif
 
 #if defined(CONFIG_RSCF_DEBUG_FAULT)

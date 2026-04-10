@@ -1,0 +1,158 @@
+/**
+ * @file packet_processor.hpp
+ * @brief 数据包处理器头文件（自动生成）
+ * 
+ * 该文件由代码生成器自动生成，请勿手动修改。
+ * 协议版本: {{ protocol.protocol_version }}
+ */
+
+#ifndef MCU_COMM_PACKET_PROCESSOR_HPP
+#define MCU_COMM_PACKET_PROCESSOR_HPP
+
+#include <cstdint>
+#include <memory>
+#include <functional>
+#include <thread>
+#include <atomic>
+#include <mutex>
+#include <condition_variable>
+#include <queue>
+#include <vector>
+#include <map>
+
+#include "protocol/protocol_parser.hpp"
+#include "processor/packet_handlers.hpp"
+
+namespace mcu_comm {
+
+/**
+ * @brief PID线程配置结构
+ */
+struct PidThreadConfig {
+    PacketID pid;
+    std::string name;
+    int priority{0};
+    size_t queue_size{100};
+};
+
+/**
+ * @brief 数据包处理器类
+ * 
+ * 负责管理多个PID处理线程，每个PID对应一个独立的处理线程。
+ * 用户通过setHandler设置自定义的IPacketHandler实现。
+ */
+class PacketProcessor {
+public:
+    using PacketData = std::vector<uint8_t>;
+    using ProcessFunction = std::function<void(const PacketData&)>;
+
+    /**
+     * @brief 构造函数
+     * @param parser 协议解析器
+     */
+    explicit PacketProcessor(std::shared_ptr<ProtocolParser> parser);
+
+    ~PacketProcessor();
+
+    /**
+     * @brief 初始化处理器
+     * @return true表示成功
+     */
+    bool initialize();
+
+    /**
+     * @brief 启动所有PID处理线程
+     * @return true表示成功
+     */
+    bool start();
+
+    /**
+     * @brief 停止所有PID处理线程
+     */
+    void stop();
+
+    /**
+     * @brief 设置用户自定义的数据包处理器
+     * @param handler 处理器接口实现
+     */
+    void setHandler(std::shared_ptr<IPacketHandler> handler);
+
+    /**
+     * @brief 提交数据包到处理队列
+     * @param pid 数据包ID
+     * @param data 数据包内容
+     * @return true表示成功加入队列
+     */
+    bool submitPacket(PacketID pid, const PacketData& data);
+
+    /**
+     * @brief 检查处理器是否正在运行
+     * @return true表示正在运行
+     */
+    bool isRunning() const;
+
+private:
+    std::shared_ptr<ProtocolParser> parser_;
+    std::shared_ptr<IPacketHandler> handler_;
+
+    std::atomic<bool> is_running_{false};
+    std::mutex handler_mutex_;
+
+    // PID到处理函数的映射
+    std::map<PacketID, ProcessFunction> pid_handlers_;
+
+    // PID线程配置
+    std::vector<PidThreadConfig> pid_configs_;
+
+    // PID处理线程
+    struct PidProcessor {
+        PacketID pid;
+        std::thread thread;
+        std::mutex queue_mutex;
+        std::condition_variable queue_cv;
+        std::queue<PacketData> data_queue;
+        std::atomic<bool> should_stop{false};
+        size_t max_queue_size{100};
+    };
+    std::map<PacketID, std::unique_ptr<PidProcessor>> pid_processors_;
+    std::mutex processors_mutex_;
+
+    // 初始化PID配置
+    void initializePidConfigs();
+
+    // 初始化PID处理函数映射
+    void initializePidHandlers();
+
+    // PID处理线程主循环
+    void processPIDLoop(PacketID pid);
+
+    // 通用模板函数声明
+    template<typename T>
+    void handlePacketTemplate(const PacketData& data, std::function<void(const T&)> callback);
+
+    // 各PID的具体处理函数（使用通用模板实现）
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+    void handle{{ packet.name | to_pascal_case }}(const PacketData& data);
+{% endif %}
+{% endfor %}
+};
+
+template<typename T>
+void PacketProcessor::handlePacketTemplate(const PacketData& data,
+                                           std::function<void(const T&)> callback) {
+    std::lock_guard<std::mutex> lock(handler_mutex_);
+    if (!handler_) {
+        return;
+    }
+
+    if (data.size() >= sizeof(T)) {
+        T msg;
+        memcpy(&msg, data.data(), sizeof(T));
+        callback(msg);
+    }
+}
+
+} // namespace mcu_comm
+
+#endif // MCU_COMM_PACKET_PROCESSOR_HPP

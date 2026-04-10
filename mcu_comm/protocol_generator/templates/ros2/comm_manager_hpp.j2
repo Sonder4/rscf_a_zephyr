@@ -1,0 +1,146 @@
+/**
+ * @file comm_manager.hpp
+ * @brief 通信管理器头文件（自动生成）
+ * 
+ * 该文件由代码生成器自动生成，请勿手动修改。
+ * 协议版本: {{ protocol.protocol_version }}
+ */
+
+#ifndef MCU_COMM_COMM_MANAGER_HPP
+#define MCU_COMM_COMM_MANAGER_HPP
+
+#include <cstdint>
+#include <memory>
+#include <functional>
+#include <thread>
+#include <atomic>
+#include <mutex>
+#include <condition_variable>
+#include <queue>
+#include <vector>
+#include <map>
+
+#include "protocol/protocol_parser.hpp"
+#include "transport/transport_interface.hpp"
+
+namespace mcu_comm {
+
+/* ============================================================================ */
+/*                              通信管理器                                      */
+/* ============================================================================ */
+
+class CommManager {
+public:
+    using PacketCallback = std::function<void(const std::vector<uint8_t>&)>;
+    using ConnectionCallback = std::function<void(bool)>;
+    
+    /**
+     * @brief 构造函数
+     * @param transport 传输层接口
+     * @param parser 协议解析器
+     */
+    CommManager(std::shared_ptr<ITransport> transport,
+                std::shared_ptr<ProtocolParser> parser);
+    
+    ~CommManager();
+    
+    /**
+     * @brief 初始化
+     * @return true表示成功
+     */
+    bool initialize();
+    
+    /**
+     * @brief 启动通信
+     * @return true表示成功
+     */
+    bool start();
+    
+    /**
+     * @brief 停止通信
+     */
+    void stop();
+    
+    /**
+     * @brief 注册数据包回调
+     * @param pid 数据包ID
+     * @param callback 回调函数
+     */
+    void registerCallback(PacketID pid, PacketCallback callback);
+    
+    /**
+     * @brief 注册连接状态回调
+     * @param callback 回调函数
+     */
+    void registerConnectionCallback(ConnectionCallback callback);
+    
+    /**
+     * @brief 发送数据帧
+     * @param pid 数据包ID
+     * @param mid 目标设备ID
+     * @param data 数据
+     * @return true表示成功
+     */
+    bool sendFrame(PacketID pid, DeviceID mid, const std::vector<uint8_t>& data);
+    
+    /**
+     * @brief 发送心跳包
+     * @return true表示成功
+     */
+    bool sendHeartbeat();
+    
+    /**
+     * @brief 检查连接状态
+     * @return true表示已连接
+     */
+    bool isConnected() const;
+    
+    /**
+     * @brief 获取统计信息
+     * @param tx_count 发送计数
+     * @param rx_count 接收计数
+     * @param error_count 错误计数
+     */
+    void getStats(uint32_t& tx_count, uint32_t& rx_count, uint32_t& error_count) const;
+
+    /**
+     * @brief 切换底层传输对象
+     * @param transport 新的传输层实例
+     */
+    void setTransport(std::shared_ptr<ITransport> transport);
+
+private:
+    std::shared_ptr<ITransport> transport_;
+    std::shared_ptr<ProtocolParser> parser_;
+    
+    std::atomic<bool> is_running_{false};
+    std::atomic<bool> is_connected_{false};
+    
+    std::thread receive_thread_;
+    std::thread process_thread_;
+    std::thread heartbeat_thread_;
+    
+    std::mutex callback_mutex_;
+    std::map<PacketID, PacketCallback> callbacks_;
+    ConnectionCallback connection_callback_;
+    
+    std::mutex queue_mutex_;
+    std::condition_variable queue_cv_;
+    std::queue<ProtocolFrame> receive_queue_;
+    
+    std::atomic<uint32_t> tx_count_{0};
+    std::atomic<uint32_t> rx_count_{0};
+    std::atomic<uint32_t> error_count_{0};
+    
+    uint8_t heartbeat_counter_{0};
+    
+    void receiveLoop();
+    void processLoop();
+    void heartbeatLoop();
+    void dispatchFrame(const ProtocolFrame& frame);
+    void updateConnectionStatus(bool connected);
+};
+
+} // namespace mcu_comm
+
+#endif // MCU_COMM_COMM_MANAGER_HPP

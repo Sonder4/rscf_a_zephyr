@@ -1,0 +1,72 @@
+/**
+ * @file packet_handlers.hpp
+ * @brief 数据包处理器接口头文件（自动生成）
+ * 
+ * 该文件由代码生成器自动生成，请勿手动修改。
+ * 协议版本: {{ protocol.protocol_version }}
+ */
+
+#ifndef MCU_COMM_PACKET_HANDLERS_HPP
+#define MCU_COMM_PACKET_HANDLERS_HPP
+
+#include <cstdint>
+#include <vector>
+
+namespace mcu_comm {
+
+{% for control_packet in packets if control_packet.control_plane_fields is defined %}
+#define {{ control_packet.name | to_upper_snake }}_NUM_BYTES {{ control_packet.control_plane_num_bytes }}U
+{% for field in control_packet.control_plane_fields %}
+#define {{ control_packet.name | to_upper_snake }}_{{ field.name | to_upper_snake }}_OFFSET {{ field.bit_offset }}U
+#define {{ control_packet.name | to_upper_snake }}_{{ field.name | to_upper_snake }}_WIDTH  {{ field.bit_width }}U
+{% endfor %}
+{% endfor %}
+#pragma pack(push, 1)
+
+{% for packet in packets %}
+/**
+ * @brief {{ packet.description }}数据结构体
+ * 
+ * PID: {{ packet.pid }}
+ * 方向: {{ packet.direction }}
+ */
+struct {{ packet.name }}_t {
+{% if packet.control_plane_fields is defined %}
+    uint8_t {{ packet.control_plane_bytes_field_name }}[{{ packet.control_plane_num_bytes }}];  /**< 控制面原始字节数组 */
+{% else %}
+{% for field in packet.data_fields %}
+    {{ protocol.type_mapping[field.type].cpp_type }} {{ field.name }};  /**< {{ field.description }} */
+{% endfor %}
+{% endif %}
+};
+
+{% endfor %}
+
+#pragma pack(pop)
+
+/**
+ * @brief 数据包处理器接口类
+ * 
+ * 用户需要继承此类并实现相应的虚函数来处理从MCU接收到的数据包。
+ * 每个mcu_to_pc和bidirectional方向的数据包对应一个纯虚函数on{PacketName}。
+ */
+class IPacketHandler {
+public:
+    virtual ~IPacketHandler() = default;
+
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+    /**
+     * @brief 处理{{ packet.name }}数据包
+     * @param data 解析后的数据结构体
+     * 
+     * {{ packet.description }}
+     */
+    virtual void on{{ packet.name | to_pascal_case }}(const {{ packet.name }}_t& data) = 0;
+{% endif %}
+{% endfor %}
+};
+
+} // namespace mcu_comm
+
+#endif // MCU_COMM_PACKET_HANDLERS_HPP

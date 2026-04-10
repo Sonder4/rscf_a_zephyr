@@ -1,0 +1,28 @@
+# SYSTEM_STATUS Layout
+
+## Summary
+- Packet Direction: `{{ system_status_packet.control_plane_packet_direction }}`
+- Bytes: `{{ system_status_packet.control_plane_num_bytes }}`
+- Fields: `{{ system_status_packet.control_plane_fields | length }}`
+
+## Fields
+| Field | Enum | Bit Offset | Bit Width | Value Range | Sync Direction | Apply Mode | Description |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+{% for field in system_status_packet.control_plane_fields %}| `{{ field.name }}` | `{% if field.is_enum_field %}{{ field.enum }}{% else %}RAW{% endif %}` | `{{ field.bit_offset }}` | `{{ field.bit_width }}` | `{{ field.value_range }}` | `{{ field.sync_direction }}` | `{{ field.apply_mode }}` | {{ field.description }} |
+{% endfor %}
+
+## Enums
+{% for enum_name, enum_info in system_status_packet.control_plane_schema.enums.items() %}
+### `{{ enum_name }}`
+
+| Value | Name | Description |
+| --- | --- | --- |
+{% for entry in enum_info.entries %}| `{{ entry.value }}` | `{{ entry.name }}` | {{ enum_info.description }} |
+{% endfor %}
+
+{% endfor %}
+## Bit Layout
+| Byte | Bit | Field | Enum | Value Range | Sync Direction | Apply Mode | Description |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+{% for item in system_status_packet.control_plane_layout %}| `{{ item.byte_index }}` | `{{ item.bit_index }}` | `{{ item.name }}` | `{{ item.enum }}` | `{{ item.value_range }}` | `{{ item.sync_direction }}` | `{{ item.apply_mode }}` | {{ item.description }} |
+{% endfor %}

@@ -1,0 +1,373 @@
+/*******************************************************************************
+
+                      版权所有 (C), 2025-2026, NCU_Roboteam
+
+ *******************************************************************************
+  文 件 名: transport_uart.c
+  版 本 号: 1.0.0
+  作    者: Xuan
+  生成日期: 2026-04-03
+  功能描述: UART传输层实现，支持DMA+IDLE或IT逐字节接收
+  补    充: 协议版本 2.0.0
+
+*******************************************************************************/
+
+/********************************包含头文件************************************/
+#include "transport_uart.h"
+
+#include <string.h>
+#include <stdbool.h>
+#include "cmsis_os.h"
+#include "main.h"
+#include "usart.h"
+#include "bsp_log.h"
+#include "bsp_usart.h"
+
+#ifndef MCU_COMM_DEBUG_TRACE
+#define MCU_COMM_DEBUG_TRACE 0
+#endif
+
+#if MCU_COMM_DEBUG_TRACE
+#define UART_TRACE_INFO(format, ...) LOGINFO("[uart] " format, ##__VA_ARGS__)
+#define UART_TRACE_WARN(format, ...) LOGWARNING("[uart] " format, ##__VA_ARGS__)
+#else
+#define UART_TRACE_INFO(format, ...)
+#define UART_TRACE_WARN(format, ...)
+#endif
+
+#ifndef MCU_COMM_UART_TX_FRAME_MAX_SIZE
+#define MCU_COMM_UART_TX_FRAME_MAX_SIZE 256U
+#endif
+
+#ifndef MCU_COMM_UART_TX_QUEUE_DEPTH
+#define MCU_COMM_UART_TX_QUEUE_DEPTH 8U
+#endif
+
+typedef enum
+{
+    UART_TRANSPORT_RX_MODE_NONE = 0,
+    UART_TRANSPORT_RX_MODE_BSP_DMA,
+    UART_TRANSPORT_RX_MODE_HAL_IT,
+} UARTTransportRxMode_e;
+
+typedef struct
+{
+    uint8_t buffer[MCU_COMM_UART_RX_BUFFER_SIZE];
+    volatile uint16_t head;
+    volatile uint16_t tail;
+    volatile bool overflow_flag;
+} UARTTransportRingBuffer_t;
+
+typedef struct
+{
+    uint8_t data[MCU_COMM_UART_TX_FRAME_MAX_SIZE];
+    uint16_t len;
+} UARTTransportTxFrame_t;
+
+static UARTTransportRingBuffer_t g_uart_rx_buffer = {.head = 0, .tail = 0, .overflow_flag = false};
+static UARTTransportTxFrame_t g_uart_tx_queue[MCU_COMM_UART_TX_QUEUE_DEPTH];
+static UART_HandleTypeDef *g_uart_handle = NULL;
+static USARTInstance *g_uart_bsp_instance = NULL;
+static UARTTransportRxMode_e g_uart_rx_mode = UART_TRANSPORT_RX_MODE_NONE;
+static uint8_t g_uart_transport_inited = 0u;
+static uint8_t g_uart_it_rx_byte = 0u;
+static volatile uint8_t g_uart_tx_head = 0u;
+static volatile uint8_t g_uart_tx_tail = 0u;
+static volatile uint8_t g_uart_tx_count = 0u;
+static volatile uint8_t g_uart_tx_busy = 0u;
+static uint32_t s_uart_tx_ok_count = 0u;
+static uint32_t s_uart_tx_fail_count = 0u;
+static uint32_t s_uart_tx_drop_count = 0u;
+
+static UART_HandleTypeDef *UART_TransportResolveHandle(MCUCommUartInstance_e instance)
+{
+    switch (instance)
+    {
+    case MCU_COMM_UART_INSTANCE_USART1: return &huart1;
+    case MCU_COMM_UART_INSTANCE_USART2: return &huart2;
+    case MCU_COMM_UART_INSTANCE_USART3: return &huart3;
+    case MCU_COMM_UART_INSTANCE_USART6: return &huart6;
+    case MCU_COMM_UART_INSTANCE_UART7:  return &huart7;
+    case MCU_COMM_UART_INSTANCE_UART8:  return &huart8;
+    default: return NULL;
+    }
+}
+
+static uint32_t UART_TransportLock(void)
+{
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+    return primask;
+}
+
+static void UART_TransportUnlock(uint32_t primask)
+{
+    if ((primask & 0x1u) == 0u)
+    {
+        __enable_irq();
+    }
+}
+
+static void UART_TransportPushBytes(const uint8_t *data, uint16_t len)
+{
+    uint16_t index;
+
+    if ((data == NULL) || (len == 0u))
+    {
+        return;
+    }
+
+    for (index = 0u; index < len; ++index)
+    {
+        uint16_t next_head = (uint16_t)((g_uart_rx_buffer.head + 1u) % MCU_COMM_UART_RX_BUFFER_SIZE);
+        if (next_head == g_uart_rx_buffer.tail)
+        {
+            g_uart_rx_buffer.overflow_flag = true;
+            break;
+        }
+        g_uart_rx_buffer.buffer[g_uart_rx_buffer.head] = data[index];
+        g_uart_rx_buffer.head = next_head;
+    }
+
+}
+
+static void UART_TransportSignalDataReadyFromISR(void)
+{
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+    if (xCommDataAvailableSemaphore == NULL)
+    {
+        return;
+    }
+
+    xSemaphoreGiveFromISR(xCommDataAvailableSemaphore, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+}
+
+static void UART_TransportKickTx(void)
+{
+    uint8_t slot = 0u;
+    uint16_t len = 0u;
+    uint32_t primask = 0u;
+    HAL_StatusTypeDef hal_status;
+
+    if ((g_uart_transport_inited == 0u) || (g_uart_handle == NULL))
+    {
+        return;
+    }
+
+    primask = UART_TransportLock();
+    if ((g_uart_tx_busy != 0u) || (g_uart_tx_count == 0u))
+    {
+        UART_TransportUnlock(primask);
+        return;
+    }
+
+    slot = g_uart_tx_tail;
+    len = g_uart_tx_queue[slot].len;
+    g_uart_tx_busy = 1u;
+    UART_TransportUnlock(primask);
+
+    /*
+     * 对UART7这类 ReceiveToIdle DMA 接收链路，避免再使用阻塞发送，
+     * 改为 IT 发送 + 软件队列，减少 HAL 内部状态锁竞争。
+     */
+    hal_status = HAL_UART_Transmit_IT(g_uart_handle, g_uart_tx_queue[slot].data, len);
+    if (hal_status != HAL_OK)
+    {
+        primask = UART_TransportLock();
+        g_uart_tx_busy = 0u;
+        UART_TransportUnlock(primask);
+
+        s_uart_tx_fail_count++;
+        UART_TRACE_WARN("tx start fail#%lu status=%u len=%u", (unsigned long)s_uart_tx_fail_count, (unsigned int)hal_status, len);
+    }
+}
+
+static void UART_TransportBspRxCallback(void *ctx, uint8_t *data, uint16_t len)
+{
+    UNUSED(ctx);
+    UART_TransportPushBytes(data, len);
+    UART_TransportSignalDataReadyFromISR();
+}
+
+bool UART_RxBufferIsOverflowed(void)
+{
+    return g_uart_rx_buffer.overflow_flag;
+}
+
+void UART_RxBufferClearOverflowFlag(void)
+{
+    g_uart_rx_buffer.overflow_flag = false;
+}
+
+bool UART_LinkIsActive(void)
+{
+    return ((g_uart_transport_inited != 0u) && (g_uart_rx_buffer.overflow_flag == false));
+}
+
+int UART_TransportInit(void)
+{
+    if (g_uart_transport_inited != 0u)
+    {
+        return 0;
+    }
+
+    g_uart_handle = UART_TransportResolveHandle((MCUCommUartInstance_e)MCU_COMM_DEFAULT_UART_INSTANCE);
+    if (g_uart_handle == NULL)
+    {
+        return -1;
+    }
+
+    memset((void *)&g_uart_rx_buffer, 0, sizeof(g_uart_rx_buffer));
+    memset((void *)g_uart_tx_queue, 0, sizeof(g_uart_tx_queue));
+    g_uart_tx_head = 0u;
+    g_uart_tx_tail = 0u;
+    g_uart_tx_count = 0u;
+    g_uart_tx_busy = 0u;
+
+    if (g_uart_handle->hdmarx != NULL)
+    {
+        USART_Init_Config_s config = {0};
+        config.recv_buff_size = MCU_COMM_UART_DMA_CHUNK_SIZE;
+        config.usart_handle = g_uart_handle;
+        config.module_callback = UART_TransportBspRxCallback;
+        config.moduleinstance = NULL;
+        g_uart_bsp_instance = USARTRegister(&config);
+        if (g_uart_bsp_instance == NULL)
+        {
+            return -1;
+        }
+        g_uart_rx_mode = UART_TRANSPORT_RX_MODE_BSP_DMA;
+    }
+    else
+    {
+        if (HAL_UART_Receive_IT(g_uart_handle, &g_uart_it_rx_byte, 1u) != HAL_OK)
+        {
+            return -1;
+        }
+        g_uart_rx_mode = UART_TRANSPORT_RX_MODE_HAL_IT;
+    }
+
+    g_uart_transport_inited = 1u;
+    return 0;
+}
+
+static int UART_TransportSend(uint8_t *data, uint16_t len)
+{
+    uint8_t slot = 0u;
+    uint8_t should_kick = 0u;
+    uint32_t primask = 0u;
+
+    if ((g_uart_transport_inited == 0u) || (g_uart_handle == NULL) || (data == NULL) || (len == 0u))
+    {
+        return -1;
+    }
+
+    if (len > MCU_COMM_UART_TX_FRAME_MAX_SIZE)
+    {
+        s_uart_tx_fail_count++;
+        UART_TRACE_WARN("tx oversize#%lu len=%u", (unsigned long)s_uart_tx_fail_count, len);
+        return -1;
+    }
+
+    primask = UART_TransportLock();
+    if (g_uart_tx_count >= MCU_COMM_UART_TX_QUEUE_DEPTH)
+    {
+        UART_TransportUnlock(primask);
+        s_uart_tx_drop_count++;
+        UART_TRACE_WARN("tx queue full#%lu len=%u", (unsigned long)s_uart_tx_drop_count, len);
+        return -1;
+    }
+
+    slot = g_uart_tx_head;
+    memcpy(g_uart_tx_queue[slot].data, data, len);
+    g_uart_tx_queue[slot].len = len;
+    g_uart_tx_head = (uint8_t)((g_uart_tx_head + 1u) % MCU_COMM_UART_TX_QUEUE_DEPTH);
+    g_uart_tx_count++;
+    should_kick = (g_uart_tx_busy == 0u) ? 1u : 0u;
+    UART_TransportUnlock(primask);
+
+    if (should_kick != 0u)
+    {
+        UART_TransportKickTx();
+    }
+
+    return 0;
+}
+
+static int UART_TransportReceive(uint8_t *buffer, uint16_t len)
+{
+    uint16_t count = 0u;
+
+    if ((buffer == NULL) || (len == 0u))
+    {
+        return 0;
+    }
+
+    while ((count < len) && (g_uart_rx_buffer.tail != g_uart_rx_buffer.head))
+    {
+        buffer[count++] = g_uart_rx_buffer.buffer[g_uart_rx_buffer.tail];
+        g_uart_rx_buffer.tail = (uint16_t)((g_uart_rx_buffer.tail + 1u) % MCU_COMM_UART_RX_BUFFER_SIZE);
+    }
+
+    return (int)count;
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+    if ((g_uart_transport_inited == 0u) || (g_uart_rx_mode != UART_TRANSPORT_RX_MODE_HAL_IT))
+    {
+        return;
+    }
+
+    if (huart != g_uart_handle)
+    {
+        return;
+    }
+
+    UART_TransportPushBytes(&g_uart_it_rx_byte, 1u);
+    UART_TransportSignalDataReadyFromISR();
+    (void)HAL_UART_Receive_IT(g_uart_handle, &g_uart_it_rx_byte, 1u);
+}
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+{
+    uint8_t should_kick = 0u;
+    uint32_t primask = 0u;
+
+    if ((g_uart_transport_inited == 0u) || (huart != g_uart_handle))
+    {
+        return;
+    }
+
+    primask = UART_TransportLock();
+    if ((g_uart_tx_busy != 0u) && (g_uart_tx_count > 0u))
+    {
+        g_uart_tx_tail = (uint8_t)((g_uart_tx_tail + 1u) % MCU_COMM_UART_TX_QUEUE_DEPTH);
+        g_uart_tx_count--;
+        s_uart_tx_ok_count++;
+    }
+    g_uart_tx_busy = 0u;
+    should_kick = (g_uart_tx_count > 0u) ? 1u : 0u;
+    UART_TransportUnlock(primask);
+
+    if (should_kick != 0u)
+    {
+        UART_TransportKickTx();
+    }
+}
+
+static bool UART_TransportIsConnected(void)
+{
+    return UART_LinkIsActive();
+}
+
+Transport_interface_t g_uart_transport = {
+    .init = UART_TransportInit,
+    .send = UART_TransportSend,
+    .receive = UART_TransportReceive,
+    .rx_overflowed = UART_RxBufferIsOverflowed,
+    .clear_rx_overflow = UART_RxBufferClearOverflowFlag,
+    .is_connected = UART_TransportIsConnected,
+};

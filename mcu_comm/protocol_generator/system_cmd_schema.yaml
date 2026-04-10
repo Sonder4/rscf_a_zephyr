@@ -1,0 +1,45 @@
+enum_source: control_plane_enums.yaml
+
+fields:
+  - name: service_id
+    enum: ServiceId
+    sync_direction: pc_to_mcu
+    apply_mode: passive
+    description: 服务标识
+
+  - name: service_arg
+    bits: 2
+    sync_direction: pc_to_mcu
+    apply_mode: passive
+    description: 服务参数
+
+  - name: service_ticket
+    bits: 2
+    sync_direction: pc_to_mcu
+    apply_mode: passive
+    description: 服务票据
+
+  - name: action_id
+    enum: ActionId
+    align_to_byte: true
+    sync_direction: pc_to_mcu
+    apply_mode: passive
+    description: 动作标识
+
+  - name: action_cmd
+    enum: ActionCmd
+    sync_direction: pc_to_mcu
+    apply_mode: passive
+    description: 动作命令
+
+  - name: action_ticket
+    bits: 2
+    sync_direction: pc_to_mcu
+    apply_mode: passive
+    description: 动作票据
+
+  - name: action_param
+    bits: 8
+    sync_direction: pc_to_mcu
+    apply_mode: passive
+    description: 动作参数

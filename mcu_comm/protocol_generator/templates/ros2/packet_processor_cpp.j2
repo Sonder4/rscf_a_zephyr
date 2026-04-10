@@ -1,0 +1,236 @@
+/**
+ * @file packet_processor.cpp
+ * @brief 数据包处理器实现（自动生成）
+ * 
+ * 该文件由代码生成器自动生成，请勿手动修改。
+ * 协议版本: {{ protocol.protocol_version }}
+ */
+
+#include "processor/packet_processor.hpp"
+#include "processor/packet_handlers.hpp"
+#include <cstring>
+#include <iostream>
+
+namespace mcu_comm {
+
+/* ============================================================================ */
+/*                              构造函数/析构函数                               */
+/* ============================================================================ */
+
+PacketProcessor::PacketProcessor(std::shared_ptr<ProtocolParser> parser)
+    : parser_(std::move(parser)) {
+    initializePidConfigs();
+    initializePidHandlers();
+}
+
+PacketProcessor::~PacketProcessor() {
+    stop();
+}
+
+/* ============================================================================ */
+/*                              初始化/启动/停止                                */
+/* ============================================================================ */
+
+bool PacketProcessor::initialize() {
+    if (!parser_) {
+        std::cerr << "PacketProcessor: parser is null" << std::endl;
+        return false;
+    }
+
+    // 预创建所有PID处理线程
+    std::lock_guard<std::mutex> lock(processors_mutex_);
+    for (const auto& config : pid_configs_) {
+        auto processor = std::make_unique<PidProcessor>();
+        processor->pid = config.pid;
+        processor->max_queue_size = config.queue_size;
+        processor->should_stop = false;
+        pid_processors_[config.pid] = std::move(processor);
+    }
+
+    return true;
+}
+
+bool PacketProcessor::start() {
+    if (is_running_) {
+        return true;
+    }
+
+    std::lock_guard<std::mutex> lock(processors_mutex_);
+
+    is_running_ = true;
+
+    // 启动所有PID处理线程
+    for (auto& [pid, processor] : pid_processors_) {
+        processor->should_stop = false;
+        processor->thread = std::thread(&PacketProcessor::processPIDLoop, this, pid);
+    }
+
+    return true;
+}
+
+void PacketProcessor::stop() {
+    if (!is_running_) {
+        return;
+    }
+
+    is_running_ = false;
+
+    {
+        std::lock_guard<std::mutex> lock(processors_mutex_);
+        // 通知所有线程停止
+        for (auto& [pid, processor] : pid_processors_) {
+            processor->should_stop = true;
+            processor->queue_cv.notify_all();
+        }
+    }
+
+    // 等待所有线程结束
+    std::lock_guard<std::mutex> lock(processors_mutex_);
+    for (auto& [pid, processor] : pid_processors_) {
+        if (processor->thread.joinable()) {
+            processor->thread.join();
+        }
+    }
+}
+
+/* ============================================================================ */
+/*                              Handler设置                                     */
+/* ============================================================================ */
+
+void PacketProcessor::setHandler(std::shared_ptr<IPacketHandler> handler) {
+    std::lock_guard<std::mutex> lock(handler_mutex_);
+    handler_ = std::move(handler);
+}
+
+/* ============================================================================ */
+/*                              数据包提交                                      */
+/* ============================================================================ */
+
+bool PacketProcessor::submitPacket(PacketID pid, const PacketData& data) {
+    if (!is_running_) {
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lock(processors_mutex_);
+    auto it = pid_processors_.find(pid);
+    if (it == pid_processors_.end()) {
+        return false;
+    }
+
+    auto& processor = it->second;
+    std::lock_guard<std::mutex> queue_lock(processor->queue_mutex);
+
+    // 检查队列是否已满
+    if (processor->data_queue.size() >= processor->max_queue_size) {
+        return false;
+    }
+
+    processor->data_queue.push(data);
+    processor->queue_cv.notify_one();
+
+    return true;
+}
+
+/* ============================================================================ */
+/*                              状态查询                                        */
+/* ============================================================================ */
+
+bool PacketProcessor::isRunning() const {
+    return is_running_.load();
+}
+
+/* ============================================================================ */
+/*                              PID配置初始化                                   */
+/* ============================================================================ */
+
+void PacketProcessor::initializePidConfigs() {
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+    pid_configs_.push_back({
+        PacketID::{{ packet.name }},
+        "{{ packet.name }}",
+        0,
+        100
+    });
+{% endif %}
+{% endfor %}
+}
+
+/* ============================================================================ */
+/*                              PID处理函数映射初始化                           */
+/* ============================================================================ */
+
+void PacketProcessor::initializePidHandlers() {
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+    pid_handlers_[PacketID::{{ packet.name }}] = [this](const PacketData& data) {
+        this->handle{{ packet.name | to_pascal_case }}(data);
+    };
+{% endif %}
+{% endfor %}
+}
+
+/* ============================================================================ */
+/*                              PID处理线程主循环                               */
+/* ============================================================================ */
+
+void PacketProcessor::processPIDLoop(PacketID pid) {
+    std::unique_ptr<PidProcessor>* processor_ptr = nullptr;
+
+    {
+        std::lock_guard<std::mutex> lock(processors_mutex_);
+        auto it = pid_processors_.find(pid);
+        if (it == pid_processors_.end()) {
+            return;
+        }
+        processor_ptr = &it->second;
+    }
+
+    auto& processor = *processor_ptr;
+
+    while (!processor->should_stop.load()) {
+        PacketData data;
+
+        {
+            std::unique_lock<std::mutex> lock(processor->queue_mutex);
+            processor->queue_cv.wait(lock, [&processor] {
+                return !processor->data_queue.empty() || processor->should_stop.load();
+            });
+
+            if (processor->should_stop.load()) {
+                break;
+            }
+
+            if (processor->data_queue.empty()) {
+                continue;
+            }
+
+            data = std::move(processor->data_queue.front());
+            processor->data_queue.pop();
+        }
+
+        // 查找并调用对应的处理函数
+        auto handler_it = pid_handlers_.find(pid);
+        if (handler_it != pid_handlers_.end()) {
+            handler_it->second(data);
+        }
+    }
+}
+
+/* ============================================================================ */
+/*                              各PID具体处理函数（使用通用模板）                   */
+/* ============================================================================ */
+
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+void PacketProcessor::handle{{ packet.name | to_pascal_case }}(const PacketData& data) {
+    handlePacketTemplate<{{ packet.name }}_t>(data,
+        [this](const {{ packet.name }}_t& msg) {
+            handler_->on{{ packet.name | to_pascal_case }}(msg);
+        });
+}
+
+{% endif %}
+{% endfor %}
+
+} // namespace mcu_comm

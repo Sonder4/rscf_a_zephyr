@@ -1,0 +1,185 @@
+#include <gtest/gtest.h>
+
+#include <chrono>
+#include <condition_variable>
+#include <cstdint>
+#include <cstring>
+#include <deque>
+#include <memory>
+#include <mutex>
+#include <thread>
+#include <vector>
+
+#include "manager/comm_manager.hpp"
+#include "protocol/protocol_parser.hpp"
+#include "transport/transport_interface.hpp"
+
+{% set ns = namespace(test_packet=None, fallback_packet=None) %}
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+{% if ns.fallback_packet is none %}
+{% set ns.fallback_packet = packet.name %}
+{% endif %}
+{% if packet.name == 'SYSTEM_STATUS' and ns.test_packet is none %}
+{% set ns.test_packet = packet.name %}
+{% endif %}
+{% endif %}
+{% endfor %}
+{% if ns.test_packet is none %}
+{% set ns.test_packet = ns.fallback_packet %}
+{% endif %}
+namespace mcu_comm {
+namespace {
+
+class FakeTransport final : public ITransport {
+public:
+    bool connect() override
+    {
+        connected_ = true;
+        return true;
+    }
+
+    void disconnect() override
+    {
+        connected_ = false;
+    }
+
+    bool isConnected() const override
+    {
+        return connected_;
+    }
+
+    bool write(const uint8_t* data, size_t size) override
+    {
+        if (!connected_ || data == nullptr) {
+            return false;
+        }
+
+        std::lock_guard<std::mutex> lock(write_mutex_);
+        writes_.emplace_back(data, data + size);
+        return true;
+    }
+
+    size_t read(uint8_t* buffer, size_t max_size) override
+    {
+        if (!connected_ || buffer == nullptr || max_size == 0U) {
+            return 0U;
+        }
+
+        std::lock_guard<std::mutex> lock(read_mutex_);
+        if (read_queue_.empty()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            return 0U;
+        }
+
+        const std::vector<uint8_t> payload = read_queue_.front();
+        read_queue_.pop_front();
+        const size_t copy_size = std::min(max_size, payload.size());
+        std::memcpy(buffer, payload.data(), copy_size);
+        return copy_size;
+    }
+
+    void setReadCallback(std::function<void(const uint8_t*, size_t)> callback) override
+    {
+        read_callback_ = std::move(callback);
+    }
+
+    void pushReadPayload(std::vector<uint8_t> payload)
+    {
+        std::lock_guard<std::mutex> lock(read_mutex_);
+        read_queue_.push_back(std::move(payload));
+    }
+
+    void forceDisconnect()
+    {
+        connected_ = false;
+    }
+
+private:
+    bool connected_{false};
+    std::function<void(const uint8_t*, size_t)> read_callback_;
+    std::mutex read_mutex_;
+    std::deque<std::vector<uint8_t>> read_queue_;
+    std::mutex write_mutex_;
+    std::vector<std::vector<uint8_t>> writes_;
+};
+
+class CommManagerConnectionStateTest : public ::testing::Test {
+protected:
+    void SetUp() override
+    {
+        transport_ = std::make_shared<FakeTransport>();
+        parser_ = std::make_shared<ProtocolParser>();
+        manager_ = std::make_unique<CommManager>(transport_, parser_);
+        ASSERT_TRUE(manager_->initialize());
+        manager_->registerConnectionCallback([this](bool connected) {
+            {
+                std::lock_guard<std::mutex> lock(events_mutex_);
+                events_.push_back(connected);
+            }
+            events_cv_.notify_all();
+        });
+    }
+
+    void TearDown() override
+    {
+        if (manager_) {
+            manager_->stop();
+        }
+    }
+
+    ProtocolFrame makeFrame()
+    {
+        return parser_->buildFrame(PacketID::{{ ns.test_packet }}, DeviceID::MCU_ONE, {0x12});
+    }
+
+    bool waitForEventCount(size_t expected_count, std::chrono::milliseconds timeout)
+    {
+        std::unique_lock<std::mutex> lock(events_mutex_);
+        return events_cv_.wait_for(lock, timeout, [this, expected_count]() {
+            return events_.size() >= expected_count;
+        });
+    }
+
+    std::vector<bool> snapshotEvents()
+    {
+        std::lock_guard<std::mutex> lock(events_mutex_);
+        return events_;
+    }
+
+    std::shared_ptr<FakeTransport> transport_;
+    std::shared_ptr<ProtocolParser> parser_;
+    std::unique_ptr<CommManager> manager_;
+    std::mutex events_mutex_;
+    std::condition_variable events_cv_;
+    std::vector<bool> events_;
+};
+
+TEST_F(CommManagerConnectionStateTest, StartReportsConnectedImmediatelyAfterTransportConnect)
+{
+    ASSERT_TRUE(manager_->start());
+    ASSERT_TRUE(waitForEventCount(1U, std::chrono::milliseconds(800)));
+
+    const auto events = snapshotEvents();
+    ASSERT_EQ(events.size(), 1U);
+    EXPECT_TRUE(events[0]);
+    EXPECT_TRUE(manager_->isConnected());
+}
+
+TEST_F(CommManagerConnectionStateTest, TransportDisconnectEmitsDisconnectCallback)
+{
+    ASSERT_TRUE(manager_->start());
+    ASSERT_TRUE(waitForEventCount(1U, std::chrono::milliseconds(800)));
+
+    transport_->forceDisconnect();
+    ASSERT_TRUE(waitForEventCount(2U, std::chrono::milliseconds(1200)));
+
+    const auto events = snapshotEvents();
+    ASSERT_EQ(events.size(), 2U);
+    EXPECT_TRUE(events[0]);
+    EXPECT_FALSE(events[1]);
+    EXPECT_FALSE(manager_->isConnected());
+}
+
+}  // namespace
+}  // namespace mcu_comm
