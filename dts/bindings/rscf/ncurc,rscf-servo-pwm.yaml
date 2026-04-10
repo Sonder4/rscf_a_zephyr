@@ -1,0 +1,31 @@
+description: RSCF PWM servo endpoint
+
+compatible: "ncurc,rscf-servo-pwm"
+
+include: base.yaml
+
+properties:
+  pwms:
+    type: phandle-array
+    required: true
+  min-angle-deg:
+    type: int
+    default: 0
+  max-angle-deg:
+    type: int
+    default: 180
+  default-angle-deg:
+    type: int
+    default: 10
+  min-pulse-us:
+    type: int
+    default: 500
+  max-pulse-us:
+    type: int
+    default: 2500
+  control-step-deg:
+    type: int
+    default: 1
+  control-period-ms:
+    type: int
+    default: 10

@@ -103,7 +103,12 @@ target_sources(app PRIVATE
   ../modules/compat/unit_convert.c
   ../modules/compat/controller.c
   ../modules/compat/daemon.c
+  ../modules/compat/led.c
+  ../modules/compat/buzzer.c
   ../modules/compat/motor_task.c
+  ../modules/motor/dji_motor.c
+  ../modules/motor/dmmotor.c
+  ../modules/motor/servo_motor.c
   ../modules/rscf/core/rscf_app_profile.c
   ../modules/rscf/services/rscf_event_bus.c
   ../modules/rscf/services/rscf_daemon_service.c

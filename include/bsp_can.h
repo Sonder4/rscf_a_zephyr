@@ -5,7 +5,7 @@
 
 #include <stdint.h>
 
-#include <zephyr/device.h>
+#include <zephyr/drivers/can.h>
 #include <stm32f4xx_hal_can.h>
 
 #define CAN_MX_REGISTER_CNT 16

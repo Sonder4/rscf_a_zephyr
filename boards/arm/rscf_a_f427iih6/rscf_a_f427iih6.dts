@@ -77,6 +77,19 @@
     startup-frequency-hz = <523>;
     status = "okay";
   };
+
+  rscf_servo_pwm: servo_pwm {
+    compatible = "ncurc,rscf-servo-pwm";
+    pwms = <&pwm5 0 PWM_USEC(3333) PWM_POLARITY_NORMAL>;
+    min-angle-deg = <0>;
+    max-angle-deg = <180>;
+    default-angle-deg = <10>;
+    min-pulse-us = <500>;
+    max-pulse-us = <2500>;
+    control-step-deg = <1>;
+    control-period-ms = <10>;
+    status = "okay";
+  };
 };
 
 &clk_hse {

@@ -6,6 +6,7 @@
 #include <rscf/rscf_event_bus.h>
 #include <rscf/rscf_health_service.h>
 #include <rscf/rscf_motor_service.h>
+#include "buzzer.h"
 #include "rscf_buzzer.h"
 #include "rscf_comm_service.h"
 #include "rscf_dtof2510.h"
@@ -38,6 +39,7 @@ int RSCFAppProfileInit(void)
   if (ret != 0) {
     return ret;
   }
+  BuzzerInit();
 #endif
 
 #if defined(CONFIG_RSCF_EVENT_BUS)
@@ -110,6 +112,8 @@ void RSCFAppProfileTick(void)
 #if defined(CONFIG_RSCF_HEALTH_SERVICE)
   RSCFHealthServiceBeat();
 #endif
+
+  BuzzerTask();
 
 #if defined(CONFIG_RSCF_COMM_SERVICE)
   RSCFCommServiceProcess();

@@ -18,6 +18,14 @@ def test_next_wave_driver_and_module_files_exist() -> None:
         "modules/rscf/devices/rscf_dtof2510.h",
         "modules/rscf/devices/rscf_imu_uart.c",
         "modules/rscf/devices/rscf_imu_uart.h",
+        "modules/motor/dji_motor.c",
+        "modules/motor/dmmotor.c",
+        "modules/motor/servo_motor.c",
+        "include/dji_motor.h",
+        "include/dmmotor.h",
+        "include/servo_motor.h",
+        "include/led.h",
+        "include/buzzer.h",
         "modules/rscf/services/rscf_comm_service.c",
         "modules/rscf/services/rscf_comm_service.h",
         "modules/rscf/services/rscf_daemon_service.c",
@@ -27,6 +35,7 @@ def test_next_wave_driver_and_module_files_exist() -> None:
         "dts/bindings/rscf/ncurc,rscf-ext-uart-mux.yaml",
         "dts/bindings/rscf/ncurc,rscf-dtof2510-group.yaml",
         "dts/bindings/rscf/ncurc,rscf-buzzer.yaml",
+        "dts/bindings/rscf/ncurc,rscf-servo-pwm.yaml",
     ]
 
     for relpath in expected:
@@ -39,6 +48,9 @@ def test_app_cmake_references_new_modules() -> None:
     assert "rscf_led_status.c" in app_cmake
     assert "rscf_ext_uart_mux.c" in app_cmake
     assert "rscf_buzzer.c" in app_cmake
+    assert "dji_motor.c" in app_cmake
+    assert "dmmotor.c" in app_cmake
+    assert "servo_motor.c" in app_cmake
     assert "rscf_comm_service.c" in app_cmake
     assert "rscf_daemon_service.c" in app_cmake
     assert "rscf_debug_fault.c" in app_cmake
@@ -54,6 +66,7 @@ def test_board_dts_declares_custom_nodes() -> None:
     assert 'compatible = "ncurc,rscf-ext-uart-mux";' in board_dts
     assert 'compatible = "ncurc,rscf-dtof2510-group";' in board_dts
     assert 'compatible = "ncurc,rscf-buzzer";' in board_dts
+    assert 'compatible = "ncurc,rscf-servo-pwm";' in board_dts
 
 
 def test_profile_initializes_new_services() -> None:
@@ -62,6 +75,7 @@ def test_profile_initializes_new_services() -> None:
     assert "RSCFLedStatusInit" in profile_c
     assert "RSCFCommServiceInit" in profile_c
     assert "RSCFDaemonServiceInit" in profile_c
+    assert "RSCFMotorServiceInit" in profile_c
     assert "RSCFDebugFaultInit" in profile_c
     assert "RSCFImuUartInit" in profile_c
     assert "RSCFDtof2510Init" in profile_c

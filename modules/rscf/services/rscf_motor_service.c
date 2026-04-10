@@ -4,6 +4,7 @@
 #include <rscf/rscf_motor_service.h>
 
 #include "motor_task.h"
+#include "servo_motor.h"
 
 LOG_MODULE_REGISTER(rscf_motor_service, LOG_LEVEL_INF);
 
@@ -27,6 +28,7 @@ int RSCFMotorServiceInit(void)
         return 0;
     }
 
+    (void)ServoControlInit();
     k_work_init_delayable(&s_motor_work, RSCFMotorServiceWorkHandler);
     (void)k_work_reschedule(&s_motor_work, K_MSEC(RSCF_MOTOR_CONTROL_PERIOD_MS));
     s_motor_service_ready = true;
