@@ -28,6 +28,8 @@ def test_next_wave_driver_and_module_files_exist() -> None:
         "include/buzzer.h",
         "modules/rscf/services/rscf_comm_service.c",
         "modules/rscf/services/rscf_comm_service.h",
+        "modules/rscf/services/rscf_chassis_service.c",
+        "include/rscf/rscf_chassis_service.h",
         "modules/rscf/services/rscf_daemon_service.c",
         "modules/rscf/services/rscf_debug_fault.c",
         "include/rscf/rscf_daemon_service.h",
@@ -52,6 +54,7 @@ def test_app_cmake_references_new_modules() -> None:
     assert "dmmotor.c" in app_cmake
     assert "servo_motor.c" in app_cmake
     assert "rscf_comm_service.c" in app_cmake
+    assert "rscf_chassis_service.c" in app_cmake
     assert "rscf_daemon_service.c" in app_cmake
     assert "rscf_debug_fault.c" in app_cmake
     assert "rscf_dtof2510.c" in app_cmake
@@ -74,6 +77,7 @@ def test_profile_initializes_new_services() -> None:
 
     assert "RSCFLedStatusInit" in profile_c
     assert "RSCFCommServiceInit" in profile_c
+    assert "RSCFChassisServiceInit" in profile_c
     assert "RSCFDaemonServiceInit" in profile_c
     assert "RSCFMotorServiceInit" in profile_c
     assert "RSCFDebugFaultInit" in profile_c
@@ -90,4 +94,5 @@ def test_event_bus_and_daemon_interfaces_are_exposed() -> None:
     assert "RSCFEventBusSubscriberRegister" in event_bus_h
     assert "RSCFDaemonRegister" in daemon_h
     assert "config RSCF_DAEMON_SERVICE" in modules_kconfig
+    assert "config RSCF_CHASSIS_SERVICE" in modules_kconfig
     assert "config RSCF_DEBUG_FAULT" in modules_kconfig

@@ -6,17 +6,21 @@
 
 LOG_MODULE_REGISTER(rscf_led_status, LOG_LEVEL_INF);
 
-#define RSCF_STATUS_LED_NODE DT_ALIAS(led0)
 #define RSCF_LED_ACTIVITY_HALF_MS 250U
 #define RSCF_LED_TASK_TIMEOUT_MS 200U
 #define RSCF_LED_IMU_TIMEOUT_MS 200U
 
-static struct gpio_dt_spec s_status_led = GPIO_DT_SPEC_GET_OR(
-  RSCF_STATUS_LED_NODE,
-  gpios,
-  {0}
-);
-static bool s_ready;
+static const struct gpio_dt_spec s_status_leds[RSCF_LED_STATUS_CHANNEL_COUNT] = {
+  [RSCF_LED_STATUS_BOOT] = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led1), gpios, {0}),
+  [RSCF_LED_STATUS_MOTOR] = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led2), gpios, {0}),
+  [RSCF_LED_STATUS_DAEMON] = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led3), gpios, {0}),
+  [RSCF_LED_STATUS_ROBOT] = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led4), gpios, {0}),
+  [RSCF_LED_STATUS_CHASSIS] = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led5), gpios, {0}),
+  [RSCF_LED_STATUS_COMM] = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led6), gpios, {0}),
+  [RSCF_LED_STATUS_IMU] = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led7), gpios, {0}),
+  [RSCF_LED_STATUS_FAULT] = GPIO_DT_SPEC_GET_OR(DT_ALIAS(led8), gpios, {0}),
+};
+static bool s_ready[RSCF_LED_STATUS_CHANNEL_COUNT];
 static bool s_health[RSCF_LED_STATUS_CHANNEL_COUNT];
 static uint32_t s_last_beat_tick[RSCF_LED_STATUS_CHANNEL_COUNT];
 static uint32_t s_activity_until_tick[RSCF_LED_STATUS_CHANNEL_COUNT];
@@ -47,6 +51,20 @@ static bool RSCFLedStatusActivityActive(uint32_t now_ms, uint32_t until_ms)
   return ((int32_t)(until_ms - now_ms) > 0) ? true : false;
 }
 
+static bool RSCFLedStatusChannelValid(enum rscf_led_status_channel channel)
+{
+  return (channel >= RSCF_LED_STATUS_BOOT) && (channel < RSCF_LED_STATUS_CHANNEL_COUNT);
+}
+
+static void RSCFLedStatusWrite(enum rscf_led_status_channel channel, bool on)
+{
+  if (!RSCFLedStatusChannelValid(channel) || !s_ready[channel]) {
+    return;
+  }
+
+  gpio_pin_set_dt(&s_status_leds[channel], on ? 1 : 0);
+}
+
 int RSCFLedStatusInit(void)
 {
   for (size_t i = 0; i < ARRAY_SIZE(s_health); ++i) {
@@ -55,16 +73,21 @@ int RSCFLedStatusInit(void)
     s_activity_until_tick[i] = 0U;
   }
 
-  if (!device_is_ready(s_status_led.port)) {
-    LOG_WRN("status led is not ready");
-    s_ready = false;
-    return 0;
+  for (size_t i = 0; i < ARRAY_SIZE(s_status_leds); ++i) {
+    if (!device_is_ready(s_status_leds[i].port)) {
+      LOG_WRN("status led %u is not ready", (unsigned int)i);
+      s_ready[i] = false;
+      continue;
+    }
+
+    (void)gpio_pin_configure_dt(&s_status_leds[i], GPIO_OUTPUT_INACTIVE);
+    s_ready[i] = true;
   }
 
-  gpio_pin_configure_dt(&s_status_led, GPIO_OUTPUT_INACTIVE);
-  s_ready = true;
   s_health[RSCF_LED_STATUS_BOOT] = true;
+  s_health[RSCF_LED_STATUS_FAULT] = true;
   s_last_beat_tick[RSCF_LED_STATUS_BOOT] = k_uptime_get_32();
+  s_last_beat_tick[RSCF_LED_STATUS_FAULT] = s_last_beat_tick[RSCF_LED_STATUS_BOOT];
   s_fatal_latched = false;
   LOG_INF("led status initialized");
   return 0;
@@ -72,7 +95,7 @@ int RSCFLedStatusInit(void)
 
 void RSCFLedStatusBeat(enum rscf_led_status_channel channel)
 {
-  if ((channel < 0) || (channel >= RSCF_LED_STATUS_CHANNEL_COUNT)) {
+  if (!RSCFLedStatusChannelValid(channel)) {
     return;
   }
 
@@ -82,7 +105,7 @@ void RSCFLedStatusBeat(enum rscf_led_status_channel channel)
 
 void RSCFLedStatusSetHealthy(enum rscf_led_status_channel channel, bool healthy)
 {
-  if ((channel < 0) || (channel >= RSCF_LED_STATUS_CHANNEL_COUNT)) {
+  if (!RSCFLedStatusChannelValid(channel)) {
     return;
   }
 
@@ -94,7 +117,7 @@ void RSCFLedStatusSetHealthy(enum rscf_led_status_channel channel, bool healthy)
 
 void RSCFLedStatusMarkActivity(enum rscf_led_status_channel channel, uint16_t hold_ms)
 {
-  if ((channel < 0) || (channel >= RSCF_LED_STATUS_CHANNEL_COUNT) || (hold_ms == 0U)) {
+  if (!RSCFLedStatusChannelValid(channel) || (hold_ms == 0U)) {
     return;
   }
 
@@ -105,10 +128,7 @@ void RSCFLedStatusLatchFatal(void)
 {
   s_fatal_latched = true;
   s_health[RSCF_LED_STATUS_FAULT] = false;
-
-  if (s_ready) {
-    gpio_pin_set_dt(&s_status_led, 1);
-  }
+  RSCFLedStatusWrite(RSCF_LED_STATUS_FAULT, false);
 }
 
 void RSCFLedStatusCloseAll(void)
@@ -117,52 +137,37 @@ void RSCFLedStatusCloseAll(void)
     s_health[i] = false;
     s_last_beat_tick[i] = 0U;
     s_activity_until_tick[i] = 0U;
-  }
-
-  if (s_ready) {
-    gpio_pin_set_dt(&s_status_led, 1);
+    RSCFLedStatusWrite((enum rscf_led_status_channel)i, false);
   }
 }
 
 void RSCFLedStatusTick(void)
 {
-  bool any_healthy = false;
-  bool blink_enabled = false;
-  bool blink_on = false;
   uint32_t now_ms;
-
-  if (!s_ready) {
-    return;
-  }
+  bool blink_on;
 
   now_ms = k_uptime_get_32();
   blink_on = (((now_ms / RSCF_LED_ACTIVITY_HALF_MS) & 0x01U) == 0U);
 
   for (size_t i = 0; i < ARRAY_SIZE(s_health); ++i) {
+    bool led_on;
+
     if ((s_beat_timeout_ms[i] > 0U) && s_health[i]) {
       if ((uint32_t)(now_ms - s_last_beat_tick[i]) > s_beat_timeout_ms[i]) {
         s_health[i] = false;
       }
     }
 
-    if (s_health[i]) {
-      any_healthy = true;
-      if (s_activity_enabled[i] &&
-          RSCFLedStatusActivityActive(now_ms, s_activity_until_tick[i])) {
-        blink_enabled = true;
-      }
+    led_on = s_health[i];
+    if (led_on && s_activity_enabled[i] &&
+        RSCFLedStatusActivityActive(now_ms, s_activity_until_tick[i])) {
+      led_on = blink_on;
     }
-  }
 
-  if (s_fatal_latched) {
-    gpio_pin_set_dt(&s_status_led, 1);
-    return;
-  }
+    if ((i == RSCF_LED_STATUS_FAULT) && s_fatal_latched) {
+      led_on = false;
+    }
 
-  if (!any_healthy) {
-    gpio_pin_set_dt(&s_status_led, 1);
-    return;
+    RSCFLedStatusWrite((enum rscf_led_status_channel)i, led_on);
   }
-
-  gpio_pin_set_dt(&s_status_led, (blink_enabled && !blink_on) ? 1 : 0);
 }

@@ -114,6 +114,7 @@ target_sources(app PRIVATE
   ../modules/rscf/services/rscf_daemon_service.c
   ../modules/rscf/services/rscf_health_service.c
   ../modules/rscf/services/rscf_comm_service.c
+  ../modules/rscf/services/rscf_chassis_service.c
   ../modules/rscf/services/rscf_motor_service.c
   ../modules/rscf/services/rscf_debug_fault.c
   ../modules/rscf/devices/rscf_dtof2510.c

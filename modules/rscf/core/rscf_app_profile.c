@@ -5,6 +5,7 @@
 #include <rscf/rscf_debug_fault.h>
 #include <rscf/rscf_event_bus.h>
 #include <rscf/rscf_health_service.h>
+#include <rscf/rscf_chassis_service.h>
 #include <rscf/rscf_motor_service.h>
 #include "buzzer.h"
 #include "rscf_buzzer.h"
@@ -72,6 +73,13 @@ int RSCFAppProfileInit(void)
 
 #if defined(CONFIG_RSCF_MOTOR_SERVICE)
   ret = RSCFMotorServiceInit();
+  if (ret != 0) {
+    return ret;
+  }
+#endif
+
+#if defined(CONFIG_RSCF_CHASSIS_SERVICE)
+  ret = RSCFChassisServiceInit();
   if (ret != 0) {
     return ret;
   }

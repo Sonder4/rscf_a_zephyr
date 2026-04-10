@@ -20,6 +20,14 @@
 
   aliases {
     led0 = &status_led;
+    led1 = &led1;
+    led2 = &led2;
+    led3 = &led3;
+    led4 = &led4;
+    led5 = &led5;
+    led6 = &led6;
+    led7 = &led7;
+    led8 = &led8;
     sw0 = &user_button;
   };
 
@@ -29,6 +37,46 @@
     status_led: led_g {
       gpios = <&gpiof 14 GPIO_ACTIVE_LOW>;
       label = "LED_G";
+    };
+
+    led1: user_led1 {
+      gpios = <&gpiog 1 GPIO_ACTIVE_LOW>;
+      label = "LED1";
+    };
+
+    led2: user_led2 {
+      gpios = <&gpiog 2 GPIO_ACTIVE_LOW>;
+      label = "LED2";
+    };
+
+    led3: user_led3 {
+      gpios = <&gpiog 3 GPIO_ACTIVE_LOW>;
+      label = "LED3";
+    };
+
+    led4: user_led4 {
+      gpios = <&gpiog 4 GPIO_ACTIVE_LOW>;
+      label = "LED4";
+    };
+
+    led5: user_led5 {
+      gpios = <&gpiog 5 GPIO_ACTIVE_LOW>;
+      label = "LED5";
+    };
+
+    led6: user_led6 {
+      gpios = <&gpiog 6 GPIO_ACTIVE_LOW>;
+      label = "LED6";
+    };
+
+    led7: user_led7 {
+      gpios = <&gpiog 7 GPIO_ACTIVE_LOW>;
+      label = "LED7";
+    };
+
+    led8: user_led8 {
+      gpios = <&gpiog 8 GPIO_ACTIVE_LOW>;
+      label = "LED8";
     };
   };
 
