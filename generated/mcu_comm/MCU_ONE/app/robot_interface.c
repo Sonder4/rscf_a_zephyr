@@ -27,6 +27,16 @@
 static bool g_is_initialized = false;
 static void* s_robot_tx_task_handle = NULL;
 static uint32_t s_pending_tx_events;
+static Transport_interface_t* s_transport_override = NULL;
+
+__attribute__((weak)) void RobotInterfaceTxPeriodicHook(void)
+{
+}
+
+__attribute__((weak)) void RobotInterfaceTxEventHook(uint32_t tx_events)
+{
+    ARG_UNUSED(tx_events);
+}
 
 #if MCU_COMM_TEST_MODE
 static uint32_t RobotInterfaceGetTickMs(void)
@@ -37,13 +47,19 @@ static uint32_t RobotInterfaceGetTickMs(void)
 
 bool RobotInterfaceInit(void)
 {
+    int ret;
+
     if (g_is_initialized)
     {
         return true;
     }
 
     PID_Registry_Init();
-    Comm_Init(NULL);
+    ret = Comm_Init(s_transport_override);
+    if (ret != 0)
+    {
+        return false;
+    }
 
     PID_RegisterCallback(PID_CHASSIS_CTRL, ChassisCtrlCallback);
     PID_RegisterCallback(PID_MOTOR_DATA, MotorDataCallback);
@@ -58,6 +74,11 @@ void RobotInterfaceDeinit(void)
 {
     g_is_initialized = false;
     s_pending_tx_events = 0U;
+}
+
+void RobotInterfaceSetTransport(Transport_interface_t* transport)
+{
+    s_transport_override = transport;
 }
 
 void RobotInterfaceBindTxTask(void* task_handle)
@@ -172,10 +193,12 @@ void RobotInterfaceProcessRx(void)
 
 void RobotInterfaceProcessTxEvent(uint32_t tx_events)
 {
-    if ((tx_events & ROBOT_INTERFACE_TX_EVENT_SYSTEM_STATUS) != 0U)
+    if (!g_is_initialized)
     {
-        (void)RobotSendSystemStatus(g_system_status.status_bytes);
+        return;
     }
+
+    RobotInterfaceTxEventHook(tx_events);
 }
 
 void RobotInterfaceProcessTxPeriodic(void)
@@ -188,6 +211,8 @@ void RobotInterfaceProcessTxPeriodic(void)
 #if MCU_COMM_TEST_MODE
     RobotInterfaceTestTick();
 #endif
+
+    RobotInterfaceTxPeriodicHook();
 }
 
 void RobotInterfaceProcess(void)

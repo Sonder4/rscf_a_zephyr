@@ -33,6 +33,7 @@
 
 bool RobotInterfaceInit(void);
 void RobotInterfaceDeinit(void);
+void RobotInterfaceSetTransport(Transport_interface_t* transport);
 void RobotInterfaceProcess(void);
 void RobotInterfaceProcessRx(void);
 void RobotInterfaceProcessTxPeriodic(void);
@@ -42,6 +43,8 @@ void RobotInterfaceRequestTxEvent(uint32_t tx_events);
 bool RobotIsConnected(void);
 bool RobotRxOverflowed(void);
 void RobotInterfaceTestTick(void);
+void RobotInterfaceTxPeriodicHook(void);
+void RobotInterfaceTxEventHook(uint32_t tx_events);
 
 bool RobotSendChassisFeedback(float vx_mps, float vy_mps, float odom_x_mm, float odom_y_mm);
 bool RobotSendMotorData(float speed_rads, float position_rad, float torque_nm, uint8_t motor_num);

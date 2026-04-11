@@ -38,7 +38,10 @@ class ZephyrProtocolGenerator(load_generator_class()):
                 continue
 
             packets = self._filter_packets_for_mcu(self.protocol_data["packets"], mcu_device["mid"])
-            default_transport = str(mcu_device.get("comm_type", "usb")).lower()
+            transport_config = self.protocol_data.get("transport_config", {})
+            default_transport = str(
+                transport_config.get("default_transport", mcu_device.get("comm_type", "usb"))
+            ).lower()
             if default_transport in {"uart", "usart", "serial"}:
                 default_transport_macro = "MCU_COMM_TRANSPORT_UART"
             elif default_transport == "can":

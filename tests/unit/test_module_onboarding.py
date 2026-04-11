@@ -30,10 +30,31 @@ def test_next_wave_driver_and_module_files_exist() -> None:
         "modules/rscf/services/rscf_comm_service.h",
         "modules/rscf/services/rscf_chassis_service.c",
         "include/rscf/rscf_chassis_service.h",
+        "modules/rscf/services/rscf_robot_service.c",
+        "include/rscf/rscf_robot_service.h",
         "modules/rscf/services/rscf_daemon_service.c",
         "modules/rscf/services/rscf_debug_fault.c",
         "include/rscf/rscf_daemon_service.h",
         "include/rscf/rscf_debug_fault.h",
+        "modules/compat/hc05.c",
+        "modules/compat/seasky_protocol.c",
+        "modules/compat/master_process.c",
+        "modules/compat/mhall.c",
+        "modules/compat/ad7190.c",
+        "modules/compat/oled.c",
+        "modules/compat/remote_control.c",
+        "modules/compat/robot.c",
+        "modules/compat/robot_cmd.c",
+        "include/HC05.h",
+        "include/seasky_protocol.h",
+        "include/master_process.h",
+        "include/mhall.h",
+        "include/AD7190.h",
+        "include/oled.h",
+        "include/remote_control.h",
+        "include/robot.h",
+        "include/robot_task.h",
+        "include/robot_cmd.h",
         "dts/bindings/rscf/ncurc,rscf-ext-uart-mux.yaml",
         "dts/bindings/rscf/ncurc,rscf-dtof2510-group.yaml",
         "dts/bindings/rscf/ncurc,rscf-buzzer.yaml",
@@ -55,10 +76,20 @@ def test_app_cmake_references_new_modules() -> None:
     assert "servo_motor.c" in app_cmake
     assert "rscf_comm_service.c" in app_cmake
     assert "rscf_chassis_service.c" in app_cmake
+    assert "rscf_robot_service.c" in app_cmake
     assert "rscf_daemon_service.c" in app_cmake
     assert "rscf_debug_fault.c" in app_cmake
     assert "rscf_dtof2510.c" in app_cmake
     assert "rscf_imu_uart.c" in app_cmake
+    assert "hc05.c" in app_cmake
+    assert "seasky_protocol.c" in app_cmake
+    assert "master_process.c" in app_cmake
+    assert "mhall.c" in app_cmake
+    assert "ad7190.c" in app_cmake
+    assert "oled.c" in app_cmake
+    assert "remote_control.c" in app_cmake
+    assert "robot.c" in app_cmake
+    assert "robot_cmd.c" in app_cmake
 
 
 def test_board_dts_declares_custom_nodes() -> None:
@@ -78,6 +109,7 @@ def test_profile_initializes_new_services() -> None:
     assert "RSCFLedStatusInit" in profile_c
     assert "RSCFCommServiceInit" in profile_c
     assert "RSCFChassisServiceInit" in profile_c
+    assert "RSCFRobotServiceInit" in profile_c
     assert "RSCFDaemonServiceInit" in profile_c
     assert "RSCFMotorServiceInit" in profile_c
     assert "RSCFDebugFaultInit" in profile_c
@@ -95,4 +127,5 @@ def test_event_bus_and_daemon_interfaces_are_exposed() -> None:
     assert "RSCFDaemonRegister" in daemon_h
     assert "config RSCF_DAEMON_SERVICE" in modules_kconfig
     assert "config RSCF_CHASSIS_SERVICE" in modules_kconfig
+    assert "config RSCF_ROBOT_SERVICE" in modules_kconfig
     assert "config RSCF_DEBUG_FAULT" in modules_kconfig

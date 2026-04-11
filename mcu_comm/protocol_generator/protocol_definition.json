@@ -40,10 +40,10 @@
         "baudrate": 115200,
         "ros2_node_name": "mcu_chassis_node",
         "ros2_launch_file": "mcu_chassis.launch.py",
-        "pc_comm_type": "tcp",
+        "pc_comm_type": "serial",
         "pc_comm": {
-          "tcp_host": "192.168.1.10",
-          "tcp_port": 8899,
+          "serial_port": "/dev/ttyACM0",
+          "baudrate": 115200,
           "debug_enabled": false
         }
       },
@@ -75,7 +75,7 @@
         "ros2_launch_file": "mcu_one.launch.py",
         "pc_comm_type": "serial",
         "pc_comm": {
-          "serial_port": "/dev/serial/by-id/usb-NCUEmbedded_Virtual_ComPort_347D38553133-if00",
+          "serial_port": "/dev/serial/by-id/usb-ZEPHYR_RSCF_A_CDC_ACM_4843500F00410035-if00",
           "baudrate": 115200,
           "debug_enabled": false
         }
@@ -114,17 +114,7 @@
       }
     },
     "ros2": {
-      "preferred_transport": "serial",
-      "fallback_transport": "serial",
-      "device_path": "/dev/serial/by-id/usb-NCUEmbedded_Virtual_ComPort_347D38553133-if00",
-      "tcp_host": "192.168.1.10",
-      "tcp_port": 8899,
-      "tcp_timeout_ms": 1000,
-      "tcp_no_delay": true,
-      "channel": 1,
-      "tx_id": "0x301",
-      "rx_id": "0x302",
-      "read_timeout_us": 10000
+      "device_path": "/dev/serial/by-id/usb-ZEPHYR_RSCF_A_CDC_ACM_4843500F00410035-if00"
     }
   },
   "link_rate_hz": {

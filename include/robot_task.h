@@ -1,0 +1,9 @@
+#ifndef ROBOT_TASK_H_
+#define ROBOT_TASK_H_
+
+#define ROBOT_CORE_PERIOD_MS 10U
+#define ROBOT_CMD_PERIOD_MS 10U
+#define ROBOT_VISION_PERIOD_MS 20U
+#define ROBOT_OLED_PERIOD_MS 100U
+
+#endif /* ROBOT_TASK_H_ */

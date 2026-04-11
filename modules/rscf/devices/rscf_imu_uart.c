@@ -12,6 +12,8 @@
 #include <rscf/rscf_daemon_service.h>
 #include <rscf/rscf_event_bus.h>
 
+#include "bsp_usart.h"
+#include "main.h"
 #include "rscf_led_status.h"
 
 LOG_MODULE_REGISTER(rscf_imu_uart, LOG_LEVEL_INF);
@@ -31,6 +33,14 @@ static uint32_t s_imu_sample_seq;
 static struct rscf_saber_topic_data s_imu_latest;
 static struct rscf_event_bus_publisher s_imu_publisher;
 static struct rscf_daemon_handle *s_imu_daemon;
+static USARTInstance *s_imu_uart_instance;
+
+static void rscf_imu_uart_rx_callback(void *instance, uint8_t *data, uint16_t len)
+{
+  ARG_UNUSED(instance);
+
+  (void)RSCFImuUartInjectFrame(data, len);
+}
 
 static void rscf_imu_uart_daemon_callback(void *owner, enum rscf_daemon_event event)
 {
@@ -94,6 +104,7 @@ int RSCFImuUartInit(void)
   memset(&s_imu_latest, 0, sizeof(s_imu_latest));
   memset(&s_imu_publisher, 0, sizeof(s_imu_publisher));
   s_imu_daemon = NULL;
+  s_imu_uart_instance = NULL;
 
   if (!s_imu_ready) {
     LOG_WRN("imu uart backend is not ready");
@@ -122,6 +133,18 @@ int RSCFImuUartInit(void)
   );
   if (ret != 0) {
     return ret;
+  }
+
+  s_imu_uart_instance = USARTRegister(
+    &(USART_Init_Config_s){
+      .recv_buff_size = 64U,
+      .usart_handle = &huart6,
+      .module_callback = rscf_imu_uart_rx_callback,
+      .moduleinstance = NULL,
+    }
+  );
+  if (s_imu_uart_instance == NULL) {
+    LOG_WRN("imu uart compatibility service is not attached");
   }
 
   RSCFLedStatusSetHealthy(RSCF_LED_STATUS_IMU, true);

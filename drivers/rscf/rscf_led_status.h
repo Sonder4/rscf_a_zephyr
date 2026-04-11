@@ -19,6 +19,7 @@ enum rscf_led_status_channel {
 int RSCFLedStatusInit(void);
 void RSCFLedStatusBeat(enum rscf_led_status_channel channel);
 void RSCFLedStatusSetHealthy(enum rscf_led_status_channel channel, bool healthy);
+void RSCFLedStatusSetBlinkHalfPeriod(enum rscf_led_status_channel channel, uint16_t half_period_ms);
 void RSCFLedStatusMarkActivity(enum rscf_led_status_channel channel, uint16_t hold_ms);
 void RSCFLedStatusLatchFatal(void);
 void RSCFLedStatusCloseAll(void);

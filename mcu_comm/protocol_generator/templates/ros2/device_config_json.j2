@@ -3,13 +3,9 @@
   "name": "{{ mcu_device.name }}",
   "family": "{{ mcu_device.family }}",
   "comm_type": "{{ mcu_device.comm_type }}",
-  "pc_comm_type": "{{ mcu_device.pc_comm_type }}",
+  "pc_comm_type": "serial",
   "baudrate": {{ mcu_device.baudrate if mcu_device.baudrate is defined else 115200 }},
 {% if mcu_device.uart_instance is defined %}  "uart_instance": "{{ mcu_device.uart_instance }}",
-{% endif %}{% if mcu_device.pc_comm_type == 'serial' %}  "serial_port": "{{ mcu_device.pc_comm.serial_port }}",
+{% endif %}  "serial_port": "{{ mcu_device.pc_comm.serial_port if mcu_device.pc_comm is defined and mcu_device.pc_comm.serial_port is defined else (transport_config.ros2.device_path if transport_config.ros2 is defined and transport_config.ros2.device_path is defined else '/dev/ttyACM0') }}",
   "debug_enabled": {{ "true" if mcu_device.pc_comm.debug_enabled is defined and mcu_device.pc_comm.debug_enabled else "false" }}
-{% else %}  "tcp_host": "{{ mcu_device.pc_comm.tcp_host }}",
-  "tcp_port": {{ mcu_device.pc_comm.tcp_port }},
-  "debug_enabled": {{ "true" if mcu_device.pc_comm.debug_enabled is defined and mcu_device.pc_comm.debug_enabled else "false" }}
-{% endif %}
 }

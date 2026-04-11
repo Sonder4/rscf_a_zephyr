@@ -8,7 +8,6 @@ WORKSPACE_DIR="${ROOT_DIR}/.workspace"
 MANIFEST_URL="file://${ROOT_DIR}"
 CMSIS_REV="512cc7e895e8491696b61f7ba8066b4a182569b8"
 HAL_STM32_REV="286dd285b5bb4fddafdfff27b5405264e5a61bfe"
-SEGGER_REV="9f08435a79d41133d7046b7c59d1b25929eda450"
 ZEPHYR_SRC_ARCHIVE="${ZEPHYR_SRC_ARCHIVE:-}"
 
 extract_zip_tree() {
@@ -73,9 +72,9 @@ fi
 (
   cd "${WORKSPACE_DIR}"
   if [[ -f "${WORKSPACE_DIR}/zephyr/CMakeLists.txt" ]]; then
-    west update cmsis hal_stm32 segger -n -o=--depth=1 || true
+    west update cmsis hal_stm32 -n -o=--depth=1 || true
   else
-    west update zephyr cmsis hal_stm32 segger -n -o=--depth=1 || true
+    west update zephyr cmsis hal_stm32 -n -o=--depth=1 || true
   fi
 )
 
@@ -93,14 +92,6 @@ if [[ ! -f "${WORKSPACE_DIR}/third_party/hal/stm32/stm32cube/stm32f4xx/drivers/i
     "${WORKSPACE_DIR}/third_party/hal/stm32" \
     "stm32cube/stm32f4xx/drivers/include/stm32f4xx_hal.h" \
     "hal_stm32-${HAL_STM32_REV}.zip"
-fi
-
-if [[ ! -f "${WORKSPACE_DIR}/modules/debug/segger/SEGGER/SEGGER_RTT.h" ]]; then
-  ensure_archive_project \
-    "https://codeload.github.com/zephyrproject-rtos/segger/zip/${SEGGER_REV}" \
-    "${WORKSPACE_DIR}/modules/debug/segger" \
-    "SEGGER/SEGGER_RTT.h" \
-    "segger-${SEGGER_REV}.zip"
 fi
 
 if [[ -f "${WORKSPACE_DIR}/zephyr/scripts/requirements-base.txt" ]]; then

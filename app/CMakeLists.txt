@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20.0)
 
 list(APPEND BOARD_ROOT ${CMAKE_CURRENT_LIST_DIR}/..)
 list(APPEND DTS_ROOT ${CMAKE_CURRENT_LIST_DIR}/..)
-set(RSCF_SEGGER_MODULE_DIR ${CMAKE_CURRENT_LIST_DIR}/../.workspace/modules/debug/segger)
+set(RSCF_SEGGER_MODULE_DIR ${CMAKE_CURRENT_LIST_DIR}/../modules/debug/segger)
 
 if(EXISTS ${RSCF_SEGGER_MODULE_DIR}/zephyr/module.yml)
   list(APPEND ZEPHYR_EXTRA_MODULES ${RSCF_SEGGER_MODULE_DIR})
@@ -11,6 +11,11 @@ endif()
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 project(rscf_a_zephyr)
+get_filename_component(RSCF_WEST_TOPDIR ${ZEPHYR_BASE} DIRECTORY)
+
+set(RSCF_CMSIS_DSP_DIR ${CMAKE_CURRENT_LIST_DIR}/../third_party/cmsis_dsp)
+set(RSCF_CMSIS_DSP_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/../third_party/cmsis_dsp/Include)
+set(RSCF_CMSIS_DSP_PRIVATE_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/../third_party/cmsis_dsp/PrivateInclude)
 
 set(RSCF_MCU_DEVICE "MCU_ONE" CACHE STRING "mcu_comm target MCU device")
 set(RSCF_MCU_COMM_OUTPUT_DIR ${CMAKE_BINARY_DIR}/generated/mcu_comm/${RSCF_MCU_DEVICE})
@@ -77,10 +82,13 @@ add_custom_target(rscf_mcu_comm_sync
 )
 
 zephyr_include_directories(${ZEPHYR_BASE}/modules/cmsis_6)
-zephyr_include_directories(${CMAKE_CURRENT_LIST_DIR}/../.workspace/third_party/hal/cmsis/CMSIS/Core/Include)
+zephyr_include_directories(${RSCF_WEST_TOPDIR}/third_party/hal/cmsis/CMSIS/Core/Include)
 zephyr_compile_definitions(SHPR=SHP)
+target_compile_definitions(app PRIVATE ARM_MATH_CM4 ARM_MATH_MATRIX_CHECK ARM_MATH_ROUNDING)
 
 target_include_directories(app PRIVATE
+  ${RSCF_CMSIS_DSP_INCLUDE_DIR}
+  ${RSCF_CMSIS_DSP_PRIVATE_INCLUDE_DIR}
   ${CMAKE_CURRENT_LIST_DIR}/../include
   ${CMAKE_CURRENT_LIST_DIR}/../drivers/rscf
   ${CMAKE_CURRENT_LIST_DIR}/../drivers/bsp
@@ -93,6 +101,7 @@ target_include_directories(app PRIVATE
 
 target_sources(app PRIVATE
   src/main.c
+  ../drivers/bsp/bsp_usart.c
   ../drivers/bsp/bsp_log.c
   ../drivers/bsp/bsp_dwt.c
   ../drivers/bsp/bsp_can.c
@@ -100,12 +109,38 @@ target_sources(app PRIVATE
   ../drivers/rscf/rscf_led_status.c
   ../drivers/rscf/rscf_ext_uart_mux.c
   ../drivers/rscf/rscf_buzzer.c
+  ../modules/algorithm/coordinate_system.c
+  ../modules/algorithm/crc8.c
+  ../modules/algorithm/crc16.c
+  ../modules/algorithm/linear_algebra.c
+  ../modules/algorithm/Kalman_filter.c
+  ../modules/algorithm/PID.c
+  ../modules/algorithm/user_lib.c
   ../modules/compat/unit_convert.c
   ../modules/compat/controller.c
   ../modules/compat/daemon.c
   ../modules/compat/led.c
   ../modules/compat/buzzer.c
+  ../modules/compat/hc05.c
+  ../modules/compat/seasky_protocol.c
+  ../modules/compat/master_process.c
+  ../modules/compat/mhall.c
+  ../modules/compat/ad7190.c
+  ../modules/compat/oled.c
+  ../modules/compat/remote_control.c
+  ../modules/compat/robot.c
+  ../modules/compat/robot_cmd.c
   ../modules/compat/motor_task.c
+  ../third_party/cmsis_dsp/Source/CommonTables/arm_common_tables.c
+  ../third_party/cmsis_dsp/Source/FastMathFunctions/arm_sin_f32.c
+  ../third_party/cmsis_dsp/Source/FastMathFunctions/arm_cos_f32.c
+  ../third_party/cmsis_dsp/Source/FastMathFunctions/arm_atan2_f32.c
+  ../third_party/cmsis_dsp/Source/MatrixFunctions/arm_mat_init_f32.c
+  ../third_party/cmsis_dsp/Source/MatrixFunctions/arm_mat_add_f32.c
+  ../third_party/cmsis_dsp/Source/MatrixFunctions/arm_mat_sub_f32.c
+  ../third_party/cmsis_dsp/Source/MatrixFunctions/arm_mat_mult_f32.c
+  ../third_party/cmsis_dsp/Source/MatrixFunctions/arm_mat_trans_f32.c
+  ../third_party/cmsis_dsp/Source/MatrixFunctions/arm_mat_inverse_f32.c
   ../modules/motor/dji_motor.c
   ../modules/motor/dmmotor.c
   ../modules/motor/servo_motor.c
@@ -115,10 +150,13 @@ target_sources(app PRIVATE
   ../modules/rscf/services/rscf_health_service.c
   ../modules/rscf/services/rscf_comm_service.c
   ../modules/rscf/services/rscf_chassis_service.c
+  ../modules/rscf/services/rscf_robot_service.c
+  ../modules/rscf/services/rscf_ros_bridge.c
   ../modules/rscf/services/rscf_motor_service.c
   ../modules/rscf/services/rscf_debug_fault.c
   ../modules/rscf/devices/rscf_dtof2510.c
   ../modules/rscf/devices/rscf_imu_uart.c
+  ../modules/rscf/devices/rscf_saber_imu_compat.c
   ${RSCF_MCU_COMM_GENERATED_SOURCES}
 )
 

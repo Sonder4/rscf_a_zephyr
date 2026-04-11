@@ -20,10 +20,6 @@ manifest:
       remote: zephyrproject
       revision: 286dd285b5bb4fddafdfff27b5405264e5a61bfe
       path: third_party/hal/stm32
-    - name: segger
-      remote: zephyrproject
-      revision: 9f08435a79d41133d7046b7c59d1b25929eda450
-      path: modules/debug/segger
 
   self:
     path: manifest

@@ -1,0 +1,3 @@
+&rscf_board {
+	comm-uart = <&usart1>;
+};

@@ -30,32 +30,17 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   DEPENDENCIES std_msgs sensor_msgs nav_msgs geometry_msgs
 )
 
-# SOULDE USB2CAN SDK path
-set(SOULDE_USB2CAN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/soulde_usb2can")
-if(NOT EXISTS "${SOULDE_USB2CAN_ROOT}/include/usb_can.h")
-  set(SOULDE_USB2CAN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/ros2_package/third_party/soulde_usb2can")
-endif()
-
 # Include directories
 include_directories(
   include
   msg
-  ${SOULDE_USB2CAN_ROOT}/include
-)
-
-add_library(soulde_usb2can SHARED IMPORTED GLOBAL)
-set_target_properties(soulde_usb2can PROPERTIES
-  IMPORTED_LOCATION "${SOULDE_USB2CAN_ROOT}/lib/libusb_can.so"
-  INTERFACE_INCLUDE_DIRECTORIES "${SOULDE_USB2CAN_ROOT}/include"
 )
 
 # Create library
 add_library(${PROJECT_NAME}_lib SHARED
   src/protocol/protocol_parser.cpp
   src/manager/comm_manager.cpp
-  src/transport/can_transport.cpp
   src/transport/serial_transport.cpp
-  src/transport/tcp_transport.cpp
   src/node/mcu_comm_node.cpp
 )
 
@@ -70,7 +55,6 @@ ament_target_dependencies(${PROJECT_NAME}_lib
 
 rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 target_link_libraries(${PROJECT_NAME}_lib "${cpp_typesupport_target}")
-target_link_libraries(${PROJECT_NAME}_lib soulde_usb2can)
 
 # Create executable
 add_executable(${PROJECT_NAME}_node src/node/main.cpp)
@@ -84,9 +68,6 @@ ament_target_dependencies(${PROJECT_NAME}_node
   geometry_msgs
 )
 
-add_executable(udp_frame_probe src/tools/udp_frame_probe.cpp)
-target_link_libraries(udp_frame_probe ${PROJECT_NAME}_lib)
-
 # Install targets
 install(TARGETS ${PROJECT_NAME}_lib
   ARCHIVE DESTINATION lib
@@ -95,10 +76,6 @@ install(TARGETS ${PROJECT_NAME}_lib
 )
 
 install(TARGETS ${PROJECT_NAME}_node
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-install(TARGETS udp_frame_probe
   DESTINATION lib/${PROJECT_NAME}
 )
 

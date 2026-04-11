@@ -53,3 +53,13 @@ def test_bootstrap_uses_repo_local_workspace() -> None:
     assert ".workspace" in bootstrap
     assert ".workspace" in getting_started
     assert "--mf west.yml" in bootstrap
+
+
+def test_segger_module_is_vendored_in_repo_root() -> None:
+    app_cmake = (REPO_ROOT / "app" / "CMakeLists.txt").read_text(encoding="utf-8")
+    west_yml = (REPO_ROOT / "west.yml").read_text(encoding="utf-8")
+
+    assert (REPO_ROOT / "modules" / "debug" / "segger" / "zephyr" / "module.yml").is_file()
+    assert "../modules/debug/segger" in app_cmake
+    assert ".workspace/modules/debug/segger" not in app_cmake
+    assert "name: segger" not in west_yml

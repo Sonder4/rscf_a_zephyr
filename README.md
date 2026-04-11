@@ -36,12 +36,29 @@ west build -b rscf_a_f427iih6 ../app
 This repository currently provides:
 
 - the workspace manifest and bootstrap flow
-- the custom board skeleton for `STM32F427IIH6`
-- a minimal Zephyr bring-up application
-- initial RSCF service and profile abstractions
+- the custom board, DTS bindings, and USB CDC ACM overlay for `STM32F427IIH6`
+- Zephyr-side BSP adapters for `CAN`, `USART`, `RTT log`, `DWT`, `LED`, `buzzer`, and external UART mux
+- migrated RSCF services for `comm`, `chassis`, `motor`, `robot`, `event bus`, `daemon`, `health`, `debug fault`, `ROS bridge`
+- migrated device paths for `Saber IMU UART` and `DTOF2510`
+- migrated compatibility modules for `DJI/DM/servo motor`, `HC05`, `AD7190`, `mhall`, `OLED`, `master_process`, `remote_control`, `robot`, and `robot_cmd`
+- integrated `mcu_comm` code generation path and serial-only host ROS2 package generation
+- vendored `CMSIS-DSP` source integration replacing the previous local `arm_math` compatibility layer
 
-Hardware-parity migration of the full legacy BSP, Modules, and APP stacks will
-be layered on top of this baseline.
+Remaining work is mainly in hardware-depth validation and non-skeleton APP roles:
+
+- `AD7190 / HC05 / mhall / OLED / remote / master_process` are integrated, but still need full real-hardware verification
+- `arm / gimbal / BT` are currently task and state-machine skeletons, not complete actuator applications
+- MCU-side `micro-ROS` is not enabled yet; the current ROS path is `mcu_comm + USB CDC`
+
+## User Manual
+
+See [docs/zephyr-user-manual.md](docs/zephyr-user-manual.md) for:
+
+- current migration coverage and known gaps
+- how Zephyr-side drivers are enabled in this repository
+- how to add or disable a driver
+- how to organize task logic with Zephyr-native patterns
+- how `mcu_comm`, ROS2, and the app profile are connected
 
 ## Bootstrap Model
 

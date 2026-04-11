@@ -32,6 +32,10 @@ config RSCF_CHASSIS_SERVICE
   bool "Enable RSCF chassis service"
   default y
 
+config RSCF_ROBOT_SERVICE
+  bool "Enable RSCF robot service"
+  default y
+
 config RSCF_MOTOR_SERVICE
   bool "Enable RSCF motor service"
   default y

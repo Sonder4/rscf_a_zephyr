@@ -159,19 +159,8 @@ void McuCommNode::invoke{{ packet.name | to_upper_snake }}Callbacks(const msg::{
 void McuCommNode::initializeParameters()
 {
     // 声明参数
-    this->declare_parameter("transport_type", "tcp");
-    this->declare_parameter("fallback_transport_type", "serial");
-    this->declare_parameter("port_name", "/dev/ttyACM1");
+    this->declare_parameter("port_name", "/dev/ttyACM0");
     this->declare_parameter("baud_rate", 115200);
-    this->declare_parameter("tcp_host", "192.168.1.10");
-    this->declare_parameter("tcp_port", 8899);
-    this->declare_parameter("tcp_timeout_ms", 1000);
-    this->declare_parameter("tcp_no_delay", true);
-    this->declare_parameter("can_device_path", "/dev/ttyACM1");
-    this->declare_parameter("can_channel", 1);
-    this->declare_parameter("can_tx_id", 0x301);
-    this->declare_parameter("can_rx_id", 0x302);
-    this->declare_parameter("can_read_timeout_us", 10000);
     this->declare_parameter("timeout_ms", 1000);
     this->declare_parameter("device_mid", 3);
     this->declare_parameter("auto_reconnect", true);
@@ -182,22 +171,11 @@ void McuCommNode::initializeParameters()
     this->declare_parameter("child_frame_id", "base_link");
     this->declare_parameter("status_publish_rate", 1.0);
     this->declare_parameter("heartbeat_rate", 1.0);
-    this->declare_parameter("cmd_send_rate", {{ protocol.link_rate_hz.pc_to_mcu if protocol.link_rate_hz is defined and protocol.link_rate_hz.pc_to_mcu is defined else 100.0 }});
+    this->declare_parameter("cmd_send_rate", {{ "%.1f"|format(protocol.link_rate_hz.pc_to_mcu if protocol.link_rate_hz is defined and protocol.link_rate_hz.pc_to_mcu is defined else 100.0) }});
 
     // 获取参数值
-    transport_type_ = this->get_parameter("transport_type").as_string();
-    fallback_transport_type_ = this->get_parameter("fallback_transport_type").as_string();
     port_name_ = this->get_parameter("port_name").as_string();
     baud_rate_ = this->get_parameter("baud_rate").as_int();
-    tcp_host_ = this->get_parameter("tcp_host").as_string();
-    tcp_port_ = this->get_parameter("tcp_port").as_int();
-    tcp_timeout_ms_ = this->get_parameter("tcp_timeout_ms").as_int();
-    tcp_no_delay_ = this->get_parameter("tcp_no_delay").as_bool();
-    can_device_path_ = this->get_parameter("can_device_path").as_string();
-    can_channel_ = this->get_parameter("can_channel").as_int();
-    can_tx_id_ = this->get_parameter("can_tx_id").as_int();
-    can_rx_id_ = this->get_parameter("can_rx_id").as_int();
-    can_read_timeout_us_ = this->get_parameter("can_read_timeout_us").as_int();
     timeout_ms_ = this->get_parameter("timeout_ms").as_int();
     device_mid_ = this->get_parameter("device_mid").as_int();
     auto_reconnect_ = this->get_parameter("auto_reconnect").as_bool();
@@ -211,17 +189,11 @@ void McuCommNode::initializeParameters()
     cmd_send_rate_ = this->get_parameter("cmd_send_rate").as_double();
 
     RCLCPP_INFO(this->get_logger(),
-                "Parameters loaded: transport=%s fallback=%s serial=%s@%d tcp=%s:%d can_dev=%s can_ch=%d can_tx=0x%X can_rx=0x%X",
-                transport_type_.c_str(),
-                fallback_transport_type_.c_str(),
+                "Parameters loaded: serial=%s@%d auto_reconnect=%s interval_ms=%d",
                 port_name_.c_str(),
                 baud_rate_,
-                tcp_host_.c_str(),
-                tcp_port_,
-                can_device_path_.c_str(),
-                can_channel_,
-                can_tx_id_,
-                can_rx_id_);
+                auto_reconnect_ ? "true" : "false",
+                reconnect_interval_ms_);
 
     RCLCPP_INFO(this->get_logger(), "MCU binding: device_mid=0x%02X", device_mid_);
 }
@@ -243,20 +215,6 @@ void McuCommNode::initializeCommunication()
 {
     // 创建协议解析器
     parser_ = std::make_shared<ProtocolParser>();
-    const auto build_transport = [this](TransportType transport_type) -> std::shared_ptr<ITransport> {
-        if (transport_type == TransportType::Can) {
-            return std::make_shared<CanTransport>(
-                can_device_path_,
-                static_cast<uint8_t>(can_channel_),
-                static_cast<uint32_t>(can_tx_id_),
-                static_cast<uint32_t>(can_rx_id_),
-                can_read_timeout_us_);
-        }
-        if (transport_type == TransportType::Tcp) {
-            return std::make_shared<TcpTransport>(tcp_host_, tcp_port_, tcp_timeout_ms_, tcp_no_delay_);
-        }
-        return std::make_shared<SerialTransport>(port_name_, baud_rate_);
-    };
 
     const auto configure_comm_manager = [this](const std::shared_ptr<ITransport>& transport) -> bool {
         transport_ = transport;
@@ -289,16 +247,7 @@ void McuCommNode::initializeCommunication()
         return comm_manager_->initialize() && comm_manager_->start();
     };
 
-    const TransportType requested_transport = ParseTransportType(transport_type_);
-    const TransportType fallback_transport = ParseTransportType(fallback_transport_type_);
-
-    bool started = configure_comm_manager(build_transport(requested_transport));
-    if (!started && (fallback_transport != requested_transport)) {
-        started = configure_comm_manager(build_transport(fallback_transport));
-        if (started) {
-            transport_type_ = TransportTypeToString(fallback_transport);
-        }
-    }
+    (void)configure_comm_manager(std::make_shared<SerialTransport>(port_name_, baud_rate_));
 
     should_reconnect_ = auto_reconnect_ && !connected_.load();
 }

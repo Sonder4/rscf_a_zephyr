@@ -6,41 +6,11 @@
 #ifndef MCU_COMM_TRANSPORT_TRANSPORT_INTERFACE_HPP
 #define MCU_COMM_TRANSPORT_TRANSPORT_INTERFACE_HPP
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <string>
 
 namespace mcu_comm {
-
-enum class TransportType : uint8_t {
-    Serial = 0,
-    Can = 1,
-    Tcp = 2,
-};
-
-inline TransportType ParseTransportType(const std::string& transport_name)
-{
-    if ((transport_name == "can") || (transport_name == "socketcan")) {
-        return TransportType::Can;
-    }
-    if ((transport_name == "tcp") || (transport_name == "socket") || (transport_name == "network")) {
-        return TransportType::Tcp;
-    }
-    return TransportType::Serial;
-}
-
-inline const char* TransportTypeToString(TransportType transport_type)
-{
-    switch (transport_type) {
-    case TransportType::Can:
-        return "can";
-    case TransportType::Tcp:
-        return "tcp";
-    case TransportType::Serial:
-    default:
-        return "serial";
-    }
-}
 
 /**
  * @brief 传输层接口基类

@@ -20,9 +20,7 @@
 #include "manager/comm_manager.hpp"
 #include "protocol/protocol_parser.hpp"
 #include "processor/packet_handlers.hpp"
-#include "transport/can_transport.hpp"
 #include "transport/serial_transport.hpp"
-#include "transport/tcp_transport.hpp"
 
 {% for packet in packets %}
 #include "mcu_comm/msg/{{ packet.name | to_snake_case }}.hpp"
@@ -86,19 +84,8 @@ public:
 
 private:
     // 参数
-    std::string transport_type_{"serial"};
-    std::string fallback_transport_type_{"serial"};
     std::string port_name_;
     int baud_rate_{115200};
-    std::string tcp_host_{"192.168.1.10"};
-    int tcp_port_{8899};
-    int tcp_timeout_ms_{1000};
-    bool tcp_no_delay_{true};
-    std::string can_device_path_{"/dev/ttyACM1"};
-    int can_channel_{ 1 };
-    int can_tx_id_{ 0x301 };
-    int can_rx_id_{ 0x302 };
-    int can_read_timeout_us_{ 10000 };
     int timeout_ms_{1000};
     int device_mid_{ 3 };
     bool auto_reconnect_{true};

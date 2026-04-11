@@ -21,7 +21,7 @@
 #include "protocol.h"
 #include "transport_interface.h"
 
-void Comm_Init(Transport_interface_t* transport);
+int Comm_Init(Transport_interface_t* transport);
 void Comm_Send(uint8_t mid, uint8_t pid, const uint8_t* data, uint8_t len);
 void Comm_Batch_Begin(void);
 void Comm_Batch_End(void);

@@ -14,6 +14,7 @@
 
 #include "comm_manager.h"
 
+#include <errno.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -42,8 +43,15 @@ static uint16_t batch_len = 0;
 static uint32_t s_callback_count[256] = {0};
 static uint32_t s_total_callback_count = 0;
 
-void Comm_Init(Transport_interface_t* transport)
+__attribute__((weak)) void Comm_OnValidRxFrame(uint8_t pid)
 {
+    (void)pid;
+}
+
+int Comm_Init(Transport_interface_t* transport)
+{
+    int ret = 0;
+
     g_transport = transport;
     if (g_transport == NULL)
     {
@@ -58,11 +66,12 @@ void Comm_Init(Transport_interface_t* transport)
 
     if ((g_transport != NULL) && (g_transport->init != NULL))
     {
-        (void)g_transport->init();
+        ret = g_transport->init();
     }
 
     ProtocolFrame_Init(&rx_frame);
     PID_Registry_Init();
+    return ret;
 }
 
 bool Comm_IsConnected(void)
@@ -112,7 +121,7 @@ void Comm_Send(uint8_t mid, uint8_t pid, const uint8_t* data, uint8_t len)
         {
             batch_len = Protocol_Pack_End(tx_buffer, batch_len);
             send_ret = g_transport->send(tx_buffer, batch_len);
-            if (send_ret != 0)
+            if ((send_ret != 0) && (send_ret != -ENOTCONN))
             {
                 COMM_TRACE_WARN("batch flush fail pid=0x%02X ret=%d len=%u", pid, send_ret, batch_len);
             }
@@ -125,7 +134,7 @@ void Comm_Send(uint8_t mid, uint8_t pid, const uint8_t* data, uint8_t len)
 
     batch_len = Protocol_Pack(mid, pid, data, len, tx_buffer);
     send_ret = g_transport->send(tx_buffer, batch_len);
-    if (send_ret != 0)
+    if ((send_ret != 0) && (send_ret != -ENOTCONN))
     {
         COMM_TRACE_WARN("tx fail pid=0x%02X ret=%d len=%u mid=0x%02X", pid, send_ret, batch_len, mid);
     }
@@ -144,7 +153,7 @@ void Comm_Batch_End(void)
 
     batch_len = Protocol_Pack_End(tx_buffer, batch_len);
     send_ret = g_transport->send(tx_buffer, batch_len);
-    if (send_ret != 0)
+    if ((send_ret != 0) && (send_ret != -ENOTCONN))
     {
         COMM_TRACE_WARN("batch end fail ret=%d len=%u", send_ret, batch_len);
     }
@@ -179,6 +188,7 @@ void Comm_ProcessRx(void)
             if (status == 3)
             {
                 uint8_t pid = rx_frame.pid;
+                Comm_OnValidRxFrame(pid);
                 if (pid_registry[pid].callback != NULL)
                 {
                     pid_registry[pid].callback(pid_registry[pid].data_ptr);

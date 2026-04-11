@@ -7,6 +7,7 @@
 #include <rscf/rscf_health_service.h>
 #include <rscf/rscf_chassis_service.h>
 #include <rscf/rscf_motor_service.h>
+#include <rscf/rscf_robot_service.h>
 #include "buzzer.h"
 #include "rscf_buzzer.h"
 #include "rscf_comm_service.h"
@@ -78,15 +79,15 @@ int RSCFAppProfileInit(void)
   }
 #endif
 
-#if defined(CONFIG_RSCF_CHASSIS_SERVICE)
-  ret = RSCFChassisServiceInit();
+#if defined(CONFIG_RSCF_IMU_UART)
+  ret = RSCFImuUartInit();
   if (ret != 0) {
     return ret;
   }
 #endif
 
-#if defined(CONFIG_RSCF_IMU_UART)
-  ret = RSCFImuUartInit();
+#if defined(CONFIG_RSCF_CHASSIS_SERVICE)
+  ret = RSCFChassisServiceInit();
   if (ret != 0) {
     return ret;
   }
@@ -101,6 +102,13 @@ int RSCFAppProfileInit(void)
 
 #if defined(CONFIG_RSCF_DEBUG_FAULT)
   ret = RSCFDebugFaultInit();
+  if (ret != 0) {
+    return ret;
+  }
+#endif
+
+#if defined(CONFIG_RSCF_ROBOT_SERVICE)
+  ret = RSCFRobotServiceInit();
   if (ret != 0) {
     return ret;
   }
@@ -123,12 +131,20 @@ void RSCFAppProfileTick(void)
 
   BuzzerTask();
 
+#if defined(CONFIG_RSCF_CHASSIS_SERVICE)
+  RSCFChassisServiceTick();
+#endif
+
 #if defined(CONFIG_RSCF_COMM_SERVICE)
   RSCFCommServiceProcess();
 #endif
 
 #if defined(CONFIG_RSCF_DEBUG_FAULT)
   RSCFDebugFaultPoll();
+#endif
+
+#if defined(CONFIG_RSCF_ROBOT_SERVICE)
+  RSCFRobotServiceTick();
 #endif
 }
 

@@ -1059,13 +1059,8 @@ class ProtocolGenerator:
             ("ros2/comm_manager_hpp.j2", include_dir / "manager" / "comm_manager.hpp"),
             ("ros2/comm_manager_cpp.j2", src_dir / "manager" / "comm_manager.cpp"),
             ("ros2/transport_interface_hpp.j2", include_dir / "transport" / "transport_interface.hpp"),
-            ("ros2/can_transport_hpp.j2", include_dir / "transport" / "can_transport.hpp"),
-            ("ros2/can_transport_cpp.j2", src_dir / "transport" / "can_transport.cpp"),
             ("ros2/serial_transport_hpp.j2", include_dir / "transport" / "serial_transport.hpp"),
             ("ros2/serial_transport_cpp.j2", src_dir / "transport" / "serial_transport.cpp"),
-            ("ros2/tcp_transport_hpp.j2", include_dir / "transport" / "tcp_transport.hpp"),
-            ("ros2/tcp_transport_cpp.j2", src_dir / "transport" / "tcp_transport.cpp"),
-            ("ros2/udp_frame_probe_cpp.j2", src_dir / "tools" / "udp_frame_probe.cpp"),
         ]
 
         if not self._render_templates(templates_to_generate):

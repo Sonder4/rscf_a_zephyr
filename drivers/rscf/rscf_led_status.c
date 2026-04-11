@@ -24,6 +24,7 @@ static bool s_ready[RSCF_LED_STATUS_CHANNEL_COUNT];
 static bool s_health[RSCF_LED_STATUS_CHANNEL_COUNT];
 static uint32_t s_last_beat_tick[RSCF_LED_STATUS_CHANNEL_COUNT];
 static uint32_t s_activity_until_tick[RSCF_LED_STATUS_CHANNEL_COUNT];
+static uint16_t s_blink_half_period_ms[RSCF_LED_STATUS_CHANNEL_COUNT];
 static bool s_fatal_latched;
 static const uint16_t s_beat_timeout_ms[RSCF_LED_STATUS_CHANNEL_COUNT] = {
   [RSCF_LED_STATUS_BOOT] = 0U,
@@ -71,6 +72,7 @@ int RSCFLedStatusInit(void)
     s_health[i] = false;
     s_last_beat_tick[i] = 0U;
     s_activity_until_tick[i] = 0U;
+    s_blink_half_period_ms[i] = 0U;
   }
 
   for (size_t i = 0; i < ARRAY_SIZE(s_status_leds); ++i) {
@@ -115,6 +117,15 @@ void RSCFLedStatusSetHealthy(enum rscf_led_status_channel channel, bool healthy)
   }
 }
 
+void RSCFLedStatusSetBlinkHalfPeriod(enum rscf_led_status_channel channel, uint16_t half_period_ms)
+{
+  if (!RSCFLedStatusChannelValid(channel)) {
+    return;
+  }
+
+  s_blink_half_period_ms[channel] = half_period_ms;
+}
+
 void RSCFLedStatusMarkActivity(enum rscf_led_status_channel channel, uint16_t hold_ms)
 {
   if (!RSCFLedStatusChannelValid(channel) || (hold_ms == 0U)) {
@@ -137,6 +148,7 @@ void RSCFLedStatusCloseAll(void)
     s_health[i] = false;
     s_last_beat_tick[i] = 0U;
     s_activity_until_tick[i] = 0U;
+    s_blink_half_period_ms[i] = 0U;
     RSCFLedStatusWrite((enum rscf_led_status_channel)i, false);
   }
 }
@@ -151,6 +163,7 @@ void RSCFLedStatusTick(void)
 
   for (size_t i = 0; i < ARRAY_SIZE(s_health); ++i) {
     bool led_on;
+    bool custom_blink_on;
 
     if ((s_beat_timeout_ms[i] > 0U) && s_health[i]) {
       if ((uint32_t)(now_ms - s_last_beat_tick[i]) > s_beat_timeout_ms[i]) {
@@ -159,7 +172,11 @@ void RSCFLedStatusTick(void)
     }
 
     led_on = s_health[i];
-    if (led_on && s_activity_enabled[i] &&
+    custom_blink_on = true;
+    if ((s_blink_half_period_ms[i] > 0U) && led_on) {
+      custom_blink_on = (((now_ms / s_blink_half_period_ms[i]) & 0x01U) == 0U);
+      led_on = custom_blink_on;
+    } else if (led_on && s_activity_enabled[i] &&
         RSCFLedStatusActivityActive(now_ms, s_activity_until_tick[i])) {
       led_on = blink_on;
     }
