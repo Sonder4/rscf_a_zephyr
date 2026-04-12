@@ -1,4 +1,3 @@
-&usbotg_fs {
 / {
 	chosen {
 		rscf,host-link = &cdc_acm_uart0;
