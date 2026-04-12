@@ -1,0 +1,98 @@
+/*******************************************************************************
+
+                      版权所有 (C), 2025-2026, NCU_Roboteam
+
+ *******************************************************************************
+  文 件 名: transport_uart.c
+  版 本 号: 1.0.0
+  作    者: Xuan
+  生成日期: {{ protocol.generation_date if protocol.generation_date is defined else '2026-04-03' }}
+  功能描述: Zephyr UART 传输层实现
+  补    充: 协议版本 {{ protocol.protocol_version }}
+
+*******************************************************************************/
+
+#include "transport_uart.h"
+
+#include <errno.h>
+#include <stdbool.h>
+
+#include <zephyr/device.h>
+#include <zephyr/devicetree.h>
+#include <zephyr/drivers/uart.h>
+
+#define RSCF_BOARD_NODE DT_NODELABEL(rscf_board)
+
+static const struct device* g_uart_dev;
+static bool g_uart_overflowed;
+static bool g_uart_ready;
+
+static bool UART_TransportIsConnected(void)
+{
+    return g_uart_ready;
+}
+
+bool UART_RxBufferIsOverflowed(void)
+{
+    return g_uart_overflowed;
+}
+
+void UART_RxBufferClearOverflowFlag(void)
+{
+    g_uart_overflowed = false;
+}
+
+bool UART_LinkIsActive(void)
+{
+    return g_uart_ready;
+}
+
+int UART_TransportInit(void)
+{
+    g_uart_dev = DEVICE_DT_GET(DT_PHANDLE(RSCF_BOARD_NODE, comm_uart));
+    g_uart_ready = device_is_ready(g_uart_dev);
+    g_uart_overflowed = false;
+    return g_uart_ready ? 0 : -ENODEV;
+}
+
+static int UART_TransportSend(uint8_t* data, uint16_t len)
+{
+    if ((!g_uart_ready) || (data == NULL) || (len == 0U))
+    {
+        return -EINVAL;
+    }
+
+    for (uint16_t i = 0U; i < len; ++i)
+    {
+        uart_poll_out(g_uart_dev, data[i]);
+    }
+
+    return 0;
+}
+
+static int UART_TransportReceive(uint8_t* buffer, uint16_t len)
+{
+    uint16_t count = 0U;
+    unsigned char byte;
+
+    if ((!g_uart_ready) || (buffer == NULL) || (len == 0U))
+    {
+        return 0;
+    }
+
+    while ((count < len) && (uart_poll_in(g_uart_dev, &byte) == 0))
+    {
+        buffer[count++] = byte;
+    }
+
+    return (int)count;
+}
+
+Transport_interface_t g_uart_transport = {
+    .init = UART_TransportInit,
+    .send = UART_TransportSend,
+    .receive = UART_TransportReceive,
+    .rx_overflowed = UART_RxBufferIsOverflowed,
+    .clear_rx_overflow = UART_RxBufferClearOverflowFlag,
+    .is_connected = UART_TransportIsConnected,
+};

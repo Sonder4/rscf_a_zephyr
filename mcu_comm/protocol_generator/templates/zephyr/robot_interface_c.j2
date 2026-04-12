@@ -1,0 +1,249 @@
+/*******************************************************************************
+
+                      版权所有 (C), 2025-2026, NCU_Roboteam
+
+ *******************************************************************************
+  文 件 名: robot_interface.c
+  版 本 号: 1.0.0
+  作    者: Xuan
+  生成日期: 2026-02-19
+  功能描述: Zephyr 机器人应用接口实现
+  补    充: 协议版本 {{ protocol.protocol_version }}
+
+*******************************************************************************/
+
+#include "robot_interface.h"
+
+#include <string.h>
+
+#include <zephyr/kernel.h>
+#include <zephyr/sys/util.h>
+
+#include "bsp_dwt.h"
+#include "bsp_log.h"
+
+#define DEVICE_MID  {{ mcu_mid }}
+
+static bool g_is_initialized = false;
+static void* s_robot_tx_task_handle = NULL;
+static uint32_t s_pending_tx_events;
+static Transport_interface_t* s_transport_override = NULL;
+
+__attribute__((weak)) void RobotInterfaceTxPeriodicHook(void)
+{
+}
+
+__attribute__((weak)) void RobotInterfaceTxEventHook(uint32_t tx_events)
+{
+    ARG_UNUSED(tx_events);
+}
+
+#if MCU_COMM_TEST_MODE
+static uint32_t RobotInterfaceGetTickMs(void)
+{
+    return (uint32_t)DWT_GetTimeline_ms();
+}
+#endif
+
+bool RobotInterfaceInit(void)
+{
+    int ret;
+
+    if (g_is_initialized)
+    {
+        return true;
+    }
+
+    PID_Registry_Init();
+    ret = Comm_Init(s_transport_override);
+    if (ret != 0)
+    {
+        return false;
+    }
+
+{% for packet in packets %}
+{% if packet.direction == 'pc_to_mcu' or packet.direction == 'bidirectional' %}
+    PID_RegisterCallback(PID_{{ packet.name | to_upper_snake }}, {{ packet.name | to_pascal_case }}Callback);
+{% endif %}
+{% endfor %}
+
+    g_is_initialized = true;
+    return true;
+}
+
+void RobotInterfaceDeinit(void)
+{
+    g_is_initialized = false;
+    s_pending_tx_events = 0U;
+}
+
+void RobotInterfaceSetTransport(Transport_interface_t* transport)
+{
+    s_transport_override = transport;
+}
+
+void RobotInterfaceBindTxTask(void* task_handle)
+{
+    s_robot_tx_task_handle = task_handle;
+}
+
+void RobotInterfaceRequestTxEvent(uint32_t tx_events)
+{
+    ARG_UNUSED(s_robot_tx_task_handle);
+    s_pending_tx_events |= tx_events;
+}
+
+{% for packet in packets %}
+{% if packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional' %}
+{% if packet.control_plane_fields is defined %}
+bool RobotSend{{ packet.name | to_pascal_case }}(const uint8_t *control_plane_bytes)
+{
+    {{ packet.name | to_camel_case }}_t data;
+
+    if (!g_is_initialized)
+    {
+        return false;
+    }
+
+    memset(data.{{ packet.control_plane_bytes_field_name }}, 0, sizeof(data.{{ packet.control_plane_bytes_field_name }}));
+    if (control_plane_bytes != NULL)
+    {
+        memcpy(data.{{ packet.control_plane_bytes_field_name }},
+               control_plane_bytes,
+               sizeof(data.{{ packet.control_plane_bytes_field_name }}));
+    }
+
+    Comm_Send(DEVICE_MID, PID_{{ packet.name | to_upper_snake }}, (uint8_t*)&data, sizeof(data));
+    return true;
+}
+
+{% else %}
+bool RobotSend{{ packet.name | to_pascal_case }}({% for field in packet.data_fields %}{{ type_mapping[field.type].c_type }} {{ field.name }}{% if not loop.last %}, {% endif %}{% endfor %})
+{
+    {{ packet.name | to_camel_case }}_t data;
+
+    if (!g_is_initialized)
+    {
+        return false;
+    }
+
+{% for field in packet.data_fields %}
+    data.{{ field.name }} = {{ field.name }};
+{% endfor %}
+    Comm_Send(DEVICE_MID, PID_{{ packet.name | to_upper_snake }}, (uint8_t*)&data, sizeof(data));
+    return true;
+}
+
+{% endif %}
+{% endif %}
+{% endfor %}
+
+void RobotInterfaceProcessRx(void)
+{
+    if (!g_is_initialized)
+    {
+        return;
+    }
+
+    Comm_ProcessRx();
+}
+
+void RobotInterfaceProcessTxEvent(uint32_t tx_events)
+{
+    if (!g_is_initialized)
+    {
+        return;
+    }
+
+    RobotInterfaceTxEventHook(tx_events);
+}
+
+void RobotInterfaceProcessTxPeriodic(void)
+{
+    if (!g_is_initialized)
+    {
+        return;
+    }
+
+#if MCU_COMM_TEST_MODE
+    RobotInterfaceTestTick();
+#endif
+
+    RobotInterfaceTxPeriodicHook();
+}
+
+void RobotInterfaceProcess(void)
+{
+    uint32_t tx_events;
+
+    RobotInterfaceProcessRx();
+    RobotInterfaceProcessTxPeriodic();
+
+    tx_events = s_pending_tx_events;
+    if (tx_events != 0U)
+    {
+        s_pending_tx_events = 0U;
+        RobotInterfaceProcessTxEvent(tx_events);
+    }
+}
+
+bool RobotIsConnected(void)
+{
+    return Comm_IsConnected();
+}
+
+bool RobotRxOverflowed(void)
+{
+    return Comm_HasRxOverflow();
+}
+
+void RobotInterfaceTestTick(void)
+{
+#if MCU_COMM_TEST_MODE
+    static uint32_t s_last_tick;
+    static uint16_t s_counter;
+    uint32_t now = RobotInterfaceGetTickMs();
+
+    if (!g_is_initialized)
+    {
+        return;
+    }
+
+    if ((uint32_t)(now - s_last_tick) < MCU_COMM_TEST_INTERVAL_MS)
+    {
+        return;
+    }
+
+    s_last_tick = now;
+    s_counter++;
+
+{% for packet in packets %}
+{% if packet.name == 'CHASSIS_FEEDBACK' and (packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional') %}
+    (void)RobotSendChassisFeedback(0.5f + 0.01f * (float)(s_counter % 20U),
+                                   -0.2f,
+                                   (float)(s_counter * 10U),
+                                   -(float)(s_counter * 5U));
+{% endif %}
+{% if packet.name == 'IMU_EULER' and (packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional') %}
+    (void)RobotSendImuEuler(0.1f, 0.2f, 0.01f * (float)(s_counter % 314U));
+{% endif %}
+{% if packet.name == 'SYSTEM_STATUS' and (packet.direction == 'mcu_to_pc' or packet.direction == 'bidirectional') %}
+    {
+        uint8_t status_bytes[SYSTEM_STATUS_NUM_BYTES] = {0};
+        status_bytes[0] = (uint8_t)(s_counter & 0x03U);
+        (void)RobotSendSystemStatus(status_bytes);
+    }
+{% endif %}
+{% endfor %}
+#endif
+}
+
+{% for packet in packets %}
+{% if packet.direction == 'pc_to_mcu' or packet.direction == 'bidirectional' %}
+__attribute__((weak)) void {{ packet.name | to_pascal_case }}Callback(void* data)
+{
+    ARG_UNUSED(data);
+}
+
+{% endif %}
+{% endfor %}

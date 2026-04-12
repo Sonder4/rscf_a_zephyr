@@ -9,7 +9,7 @@ twister-out/
 __pycache__/
 *.pyc
 compile_commands.json
-zephyr/
+/zephyr/
 .zread/
 logs/
 artifacts/

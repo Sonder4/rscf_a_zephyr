@@ -1,0 +1,50 @@
+/*******************************************************************************
+
+                      版权所有 (C), 2025-2026, NCU_Roboteam
+
+ *******************************************************************************
+  文 件 名: data_def.c
+  版 本 号: 1.0.0
+  作    者: Xuan
+  生成日期: {{ protocol.generation_date if protocol.generation_date is defined else '2026-02-11' }}
+  功能描述: Zephyr 通信协议数据结构序列化实现与PID注册表
+  补    充: 协议版本 {{ protocol.protocol_version }}
+
+*******************************************************************************/
+
+#include "data_def.h"
+
+#include <string.h>
+
+{% for packet in packets %}
+{{ packet.name | to_camel_case }}_t g_{{ packet.name | to_snake_case }};
+{% endfor %}
+
+PID_Entry_t pid_registry[256];
+
+void PID_Registry_Init(void)
+{
+    memset(pid_registry, 0, sizeof(pid_registry));
+
+{% for packet in packets %}
+    pid_registry[PID_{{ packet.name | to_upper_snake }}].target_mid = {{ packet | get_target_mid(mcu_mid) }};
+    pid_registry[PID_{{ packet.name | to_upper_snake }}].data_len = sizeof({{ packet.name | to_camel_case }}_t);
+    pid_registry[PID_{{ packet.name | to_upper_snake }}].callback = NULL;
+    pid_registry[PID_{{ packet.name | to_upper_snake }}].data_ptr = &g_{{ packet.name | to_snake_case }};
+
+{% endfor %}
+}
+
+void PID_RegisterCallback(uint8_t pid, PID_Callback_t callback)
+{
+    pid_registry[pid].callback = callback;
+}
+
+{% for packet in packets %}
+uint16_t {{ packet.name | to_snake_case }}_serialize(const {{ packet.name | to_camel_case }}_t* data, uint8_t* buf)
+{
+    memcpy(buf, data, sizeof({{ packet.name | to_camel_case }}_t));
+    return sizeof({{ packet.name | to_camel_case }}_t);
+}
+
+{% endfor %}

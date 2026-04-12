@@ -1,0 +1,28 @@
+/*******************************************************************************
+
+                      版权所有 (C), 2025-2026, NCU_Roboteam
+
+ *******************************************************************************
+  文 件 名: transport_usb.h
+  版 本 号: 1.0.0
+  作    者: Xuan
+  生成日期: {{ protocol.generation_date if protocol.generation_date is defined else '2026-02-11' }}
+  功能描述: Zephyr USB 传输层头文件
+  补    充: 协议版本 {{ protocol.protocol_version }}
+
+*******************************************************************************/
+
+#ifndef TRANSPORT_USB_H
+#define TRANSPORT_USB_H
+
+#include "transport_interface.h"
+
+int USB_Init(void);
+bool USB_DeviceConfigured(void);
+bool USB_LinkIsActive(void);
+bool USB_RxBufferIsOverflowed(void);
+void USB_RxBufferClearOverflowFlag(void);
+
+extern Transport_interface_t g_usb_transport;
+
+#endif /* TRANSPORT_USB_H */
