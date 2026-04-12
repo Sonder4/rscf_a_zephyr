@@ -21,6 +21,24 @@ def _load_codegen_module():
     return module
 
 
+def _write_temp_protocol(tmp_path, mutate):
+    protocol = json.loads(PROTOCOL_PATH.read_text(encoding="utf-8"))
+    mutate(protocol)
+
+    temp_protocol = tmp_path / "protocol_definition.json"
+    temp_protocol.write_text(json.dumps(protocol, ensure_ascii=False, indent=2), encoding="utf-8")
+    for file_name in [
+        "endpoint_schema.yaml",
+        "link_roles.yaml",
+        "system_status_schema.yaml",
+        "system_cmd_schema.yaml",
+        "control_plane_enums.yaml",
+    ]:
+        source_path = GENERATOR_DIR / file_name
+        (tmp_path / file_name).write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8")
+    return temp_protocol
+
+
 def test_vnext_schema_files_present_and_loadable():
     protocol = json.loads(PROTOCOL_PATH.read_text(encoding="utf-8"))
 
@@ -75,3 +93,40 @@ def test_base_generator_loads_vnext_metadata_without_breaking_contract():
     assert vnext_context["vnext"]["endpoints"]["schema"] == "endpoint_schema.yaml"
     assert vnext_context["vnext_endpoints"]["compat"]["by_mid"]["0x05"] == "mcu_one"
     assert vnext_context["vnext_links"]["roles"] == "link_roles.yaml"
+
+
+def test_invalid_endpoint_item_is_rejected(tmp_path):
+    module = _load_codegen_module()
+
+    def mutate(protocol):
+        protocol["endpoints"]["items"][0]["kind"] = "invalid_kind"
+
+    temp_protocol = _write_temp_protocol(tmp_path, mutate)
+    generator = module.load_generator_class()(str(temp_protocol), str(REPO_ROOT))
+
+    assert not generator.load_protocol()
+
+
+def test_stale_compat_map_is_rejected(tmp_path):
+    module = _load_codegen_module()
+
+    def mutate(protocol):
+        protocol["endpoints"]["compat"]["by_mid"]["0x99"] = "ghost_endpoint"
+
+    temp_protocol = _write_temp_protocol(tmp_path, mutate)
+    generator = module.load_generator_class()(str(temp_protocol), str(REPO_ROOT))
+
+    assert not generator.load_protocol()
+
+
+def test_invalid_link_endpoint_and_role_are_rejected(tmp_path):
+    module = _load_codegen_module()
+
+    def mutate(protocol):
+        protocol["links"]["items"][0]["role"] = "ghost_role"
+        protocol["links"]["items"][0]["endpoints"] = ["pc_master", "ghost_endpoint"]
+
+    temp_protocol = _write_temp_protocol(tmp_path, mutate)
+    generator = module.load_generator_class()(str(temp_protocol), str(REPO_ROOT))
+
+    assert not generator.load_protocol()

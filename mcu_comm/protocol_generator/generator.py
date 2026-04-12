@@ -35,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 class ProtocolGenerator:
     """协议代码生成器主类"""
+
+    ALLOWED_VNEXT_ENDPOINT_KINDS = {'pc', 'mcu', 'bridge'}
     
     # STM32类型长度映射（以STM32为基准）
     # 支持两种格式：带_t后缀和不带_t后缀
@@ -736,6 +738,9 @@ class ProtocolGenerator:
             if link_roles is None:
                 return False
 
+        if not self._validate_vnext_metadata(endpoints, links, link_roles):
+            return False
+
         compat_endpoints = copy.deepcopy(endpoints.get('compat', {}))
 
         self.protocol_data['endpoint_schema'] = endpoint_schema
@@ -748,6 +753,113 @@ class ProtocolGenerator:
             'link_roles': link_roles,
             'compat_endpoints': compat_endpoints,
         }
+        return True
+
+    def _validate_vnext_metadata(
+        self,
+        endpoints: Dict[str, Any],
+        links: Dict[str, Any],
+        link_roles: Dict[str, Any],
+    ) -> bool:
+        endpoint_ids = self._validate_vnext_endpoints(endpoints)
+        if endpoint_ids is None:
+            return False
+        if not self._validate_vnext_compat_maps(endpoints.get('compat', {}), endpoint_ids):
+            return False
+        if not self._validate_vnext_links(links, endpoint_ids, link_roles):
+            return False
+        return True
+
+    def _validate_vnext_endpoints(self, endpoints: Dict[str, Any]) -> Optional[set]:
+        endpoint_items = endpoints.get('items', [])
+        if not isinstance(endpoint_items, list):
+            logger.error('endpoints.items必须为列表')
+            return None
+
+        endpoint_ids = set()
+        for index, endpoint in enumerate(endpoint_items):
+            if not isinstance(endpoint, dict):
+                logger.error(f'endpoints.items[{index}]必须为对象')
+                return None
+
+            endpoint_id = str(endpoint.get('id', '')).strip()
+            endpoint_kind = str(endpoint.get('kind', '')).strip()
+            endpoint_role = str(endpoint.get('role', '')).strip()
+
+            if not endpoint_id or not endpoint_kind or not endpoint_role:
+                logger.error(f'endpoints.items[{index}]缺少必要字段id/kind/role')
+                return None
+            if endpoint_kind not in self.ALLOWED_VNEXT_ENDPOINT_KINDS:
+                logger.error(f'endpoints.items[{index}] kind非法: {endpoint_kind}')
+                return None
+            if endpoint_id in endpoint_ids:
+                logger.error(f'endpoints.items[{index}] id重复: {endpoint_id}')
+                return None
+            endpoint_ids.add(endpoint_id)
+
+        return endpoint_ids
+
+    def _validate_vnext_compat_maps(self, compat_endpoints: Any, endpoint_ids: set) -> bool:
+        if not compat_endpoints:
+            return True
+        if not isinstance(compat_endpoints, dict):
+            logger.error('endpoints.compat必须为对象')
+            return False
+
+        for compat_key in ('by_mid', 'by_device'):
+            compat_map = compat_endpoints.get(compat_key, {})
+            if not compat_map:
+                continue
+            if not isinstance(compat_map, dict):
+                logger.error(f'endpoints.compat.{compat_key}必须为对象')
+                return False
+            for source_key, endpoint_id in compat_map.items():
+                if str(endpoint_id) not in endpoint_ids:
+                    logger.error(
+                        f'endpoints.compat.{compat_key}[{source_key}]引用了未知endpoint: {endpoint_id}'
+                    )
+                    return False
+        return True
+
+    def _validate_vnext_links(
+        self,
+        links: Dict[str, Any],
+        endpoint_ids: set,
+        link_roles: Dict[str, Any],
+    ) -> bool:
+        link_items = links.get('items', [])
+        if not isinstance(link_items, list):
+            logger.error('links.items必须为列表')
+            return False
+
+        allowed_roles = link_roles.get('roles', {}) if isinstance(link_roles, dict) else {}
+        if allowed_roles and not isinstance(allowed_roles, dict):
+            logger.error('link_roles.roles必须为对象')
+            return False
+
+        for index, link in enumerate(link_items):
+            if not isinstance(link, dict):
+                logger.error(f'links.items[{index}]必须为对象')
+                return False
+
+            link_role = str(link.get('role', '')).strip()
+            link_endpoints = link.get('endpoints', [])
+
+            if not link_role:
+                logger.error(f'links.items[{index}]缺少必要字段role')
+                return False
+            if allowed_roles and link_role not in allowed_roles:
+                logger.error(f'links.items[{index}] role未在link_roles中定义: {link_role}')
+                return False
+            if not isinstance(link_endpoints, list):
+                logger.error(f'links.items[{index}].endpoints必须为列表')
+                return False
+
+            for endpoint_id in link_endpoints:
+                if str(endpoint_id) not in endpoint_ids:
+                    logger.error(f'links.items[{index}]引用了未知endpoint: {endpoint_id}')
+                    return False
+
         return True
 
     def _build_vnext_context(self) -> Dict[str, Any]:
