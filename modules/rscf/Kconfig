@@ -28,6 +28,38 @@ config RSCF_COMM_SERVICE
   bool "Enable RSCF communication service"
   default y
 
+config RSCF_ROS_BACKEND_MICROROS
+  bool "Use micro-ROS as ROS backend"
+  default n
+
+config RSCF_MICROROS_SERVICE
+  bool "Enable RSCF micro-ROS service"
+  default y
+  depends on RSCF_ROS_BACKEND_MICROROS
+
+config RSCF_MICROROS_SIM_MODE
+  bool "Enable micro-ROS simulated odom/imu data"
+  default y
+  depends on RSCF_MICROROS_SERVICE
+
+config RSCF_MICROROS_ODOM_RATE_HZ
+  int "micro-ROS odom publish rate (Hz)"
+  range 1 1000
+  default 200
+  depends on RSCF_MICROROS_SERVICE
+
+config RSCF_MICROROS_CMD_RATE_HZ
+  int "micro-ROS command loop rate (Hz)"
+  range 1 1000
+  default 200
+  depends on RSCF_MICROROS_SERVICE
+
+config RSCF_MICROROS_STATUS_RATE_HZ
+  int "micro-ROS status publish rate (Hz)"
+  range 1 1000
+  default 20
+  depends on RSCF_MICROROS_SERVICE
+
 config RSCF_CHASSIS_SERVICE
   bool "Enable RSCF chassis service"
   default y

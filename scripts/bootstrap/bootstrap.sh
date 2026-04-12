@@ -9,6 +9,49 @@ MANIFEST_URL="file://${ROOT_DIR}"
 CMSIS_REV="512cc7e895e8491696b61f7ba8066b4a182569b8"
 HAL_STM32_REV="286dd285b5bb4fddafdfff27b5405264e5a61bfe"
 ZEPHYR_SRC_ARCHIVE="${ZEPHYR_SRC_ARCHIVE:-}"
+PYTHON_MIN_VERSION="${PYTHON_MIN_VERSION:-3.12}"
+
+python_version_ok() {
+  local python_bin="$1"
+
+  if [[ ! -x "${python_bin}" ]]; then
+    return 1
+  fi
+
+  "${python_bin}" - "${PYTHON_MIN_VERSION}" <<'PY'
+import sys
+
+required = tuple(int(part) for part in sys.argv[1].split("."))
+sys.exit(0 if sys.version_info[:len(required)] >= required else 1)
+PY
+}
+
+ensure_repo_venv() {
+  if python_version_ok "${VENV_DIR}/bin/python3"; then
+    return 0
+  fi
+
+  rm -rf "${VENV_DIR}"
+
+  if command -v uv >/dev/null 2>&1; then
+    uv python install "${PYTHON_MIN_VERSION}"
+    uv venv --seed --python "${PYTHON_MIN_VERSION}" "${VENV_DIR}"
+    return 0
+  fi
+
+  if command -v "python${PYTHON_MIN_VERSION}" >/dev/null 2>&1; then
+    "python${PYTHON_MIN_VERSION}" -m venv "${VENV_DIR}"
+    return 0
+  fi
+
+  if python_version_ok "$(command -v python3 2>/dev/null || true)"; then
+    python3 -m venv "${VENV_DIR}"
+    return 0
+  fi
+
+  echo "Python ${PYTHON_MIN_VERSION}+ is required. Install it or provide uv to bootstrap the repo venv." >&2
+  return 1
+}
 
 extract_zip_tree() {
   local archive_path="$1"
@@ -47,12 +90,27 @@ ensure_archive_project() {
   extract_zip_tree "${archive_path}" "${destination_dir}"
 }
 
-if [[ ! -d "${VENV_DIR}" ]]; then
-  python3 -m venv "${VENV_DIR}"
-fi
+ensure_repo_venv
 
 # shellcheck disable=SC1091
 source "${VENV_DIR}/bin/activate"
+
+if [[ -z "${GNUARMEMB_TOOLCHAIN_PATH:-}" ]] && [[ -z "${ZEPHYR_SDK_INSTALL_DIR:-}" ]]; then
+  GNUARMEMB_TOOLCHAIN_PATH="$(find /opt/st -maxdepth 2 -type d -path '/opt/st/stm32cubeclt_*/GNU-tools-for-STM32' | sort -V | tail -n 1)"
+  if [[ -n "${GNUARMEMB_TOOLCHAIN_PATH}" ]]; then
+    export GNUARMEMB_TOOLCHAIN_PATH
+    export ZEPHYR_TOOLCHAIN_VARIANT=gnuarmemb
+  fi
+fi
+
+if [[ -n "${GNUARMEMB_TOOLCHAIN_PATH:-}" ]]; then
+  TOOLCHAIN_ROOT="$(cd "${GNUARMEMB_TOOLCHAIN_PATH}/.." && pwd)"
+  if [[ -d "${TOOLCHAIN_ROOT}/CMake/bin" ]]; then
+    export PATH="${TOOLCHAIN_ROOT}/CMake/bin:${PATH}"
+  fi
+fi
+
+python3 -m ensurepip --upgrade >/dev/null 2>&1 || true
 
 python3 -m pip install --upgrade pip
 python3 -m pip install west

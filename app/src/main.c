@@ -6,7 +6,7 @@
 
 LOG_MODULE_REGISTER(rscf_main, LOG_LEVEL_INF);
 
-#define RSCF_MAIN_LOOP_PERIOD_MS 10
+#define RSCF_MAIN_LOOP_PERIOD_MS 1
 
 int main(void)
 {

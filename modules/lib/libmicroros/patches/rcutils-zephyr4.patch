@@ -1,0 +1,26 @@
+--- a/src/strcasecmp.c
++++ b/src/strcasecmp.c
+@@ -19,6 +19,9 @@
+ 
+ #include <errno.h>
+ #include <string.h>
++#ifndef _WIN32
++#include <strings.h>
++#endif
+ 
+ #include "rcutils/strcasecmp.h"
+ 
+--- a/src/logging.c
++++ b/src/logging.c
+@@ -799,7 +799,11 @@
+ # define COLOR_RED "\033[31m"
+ # define COLOR_GREEN "\033[32m"
+ # define COLOR_YELLOW "\033[33m"
++# if defined(__ZEPHYR__)
++#  define IS_STREAM_A_TTY(stream) (false)
++# else
+ # define IS_STREAM_A_TTY(stream) (isatty(fileno(stream)) != 0)
++# endif
+ #endif
+ 
+ #define IS_OUTPUT_COLORIZED(is_colorized) \

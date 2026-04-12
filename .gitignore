@@ -10,4 +10,15 @@ __pycache__/
 *.pyc
 compile_commands.json
 zephyr/
-third_party/
+.zread/
+logs/
+artifacts/
+third_party/*
+!third_party/cmsis_dsp/
+third_party/cmsis_dsp/*
+!third_party/cmsis_dsp/Include/
+!third_party/cmsis_dsp/Include/**
+!third_party/cmsis_dsp/PrivateInclude/
+!third_party/cmsis_dsp/PrivateInclude/**
+!third_party/cmsis_dsp/Source/
+!third_party/cmsis_dsp/Source/**

@@ -816,6 +816,12 @@ void RSCFChassisServiceSetVelocityFrame(uint8_t velocity_frame)
     s_chassis.velocity_frame = velocity_frame;
 }
 
+void RSCFChassisServiceSetHeadingTarget(float heading_deg)
+{
+    s_chassis.heading_target_deg = heading_deg;
+    RSCFChassisRequestStatusTx();
+}
+
 uint8_t RSCFChassisServiceGetControlMode(void)
 {
     return s_chassis.ctrl_mode;
@@ -829,6 +835,92 @@ uint8_t RSCFChassisServiceGetHeadingMode(void)
 uint8_t RSCFChassisServiceGetVelocityFrame(void)
 {
     return s_chassis.velocity_frame;
+}
+
+bool RSCFChassisServiceGetOdom(float *x_m,
+                               float *y_m,
+                               float *yaw_rad,
+                               float *vx_mps,
+                               float *vy_mps,
+                               float *wz_radps)
+{
+    if (x_m != NULL)
+    {
+        *x_m = s_chassis.map_odom.x_m;
+    }
+
+    if (y_m != NULL)
+    {
+        *y_m = s_chassis.map_odom.y_m;
+    }
+
+    if (yaw_rad != NULL)
+    {
+        *yaw_rad = s_chassis.map_odom.yaw_rad;
+    }
+
+    if (vx_mps != NULL)
+    {
+        *vx_mps = s_chassis.map_odom.vx_mps;
+    }
+
+    if (vy_mps != NULL)
+    {
+        *vy_mps = s_chassis.map_odom.vy_mps;
+    }
+
+    if (wz_radps != NULL)
+    {
+        *wz_radps = s_chassis.body_odom.wz_radps;
+    }
+
+    return s_chassis.odom_ok;
+}
+
+bool RSCFChassisServiceGetImuData(float *roll_deg,
+                                  float *pitch_deg,
+                                  float *yaw_deg,
+                                  float *gyro_z_dps,
+                                  float *acc_x,
+                                  float *acc_y,
+                                  float *acc_z)
+{
+    if (roll_deg != NULL)
+    {
+        *roll_deg = s_chassis.imu_roll_deg;
+    }
+
+    if (pitch_deg != NULL)
+    {
+        *pitch_deg = s_chassis.imu_pitch_deg;
+    }
+
+    if (yaw_deg != NULL)
+    {
+        *yaw_deg = s_chassis.imu_yaw_deg;
+    }
+
+    if (gyro_z_dps != NULL)
+    {
+        *gyro_z_dps = s_chassis.imu_gyro_z_dps;
+    }
+
+    if (acc_x != NULL)
+    {
+        *acc_x = s_chassis.imu_acc_x;
+    }
+
+    if (acc_y != NULL)
+    {
+        *acc_y = s_chassis.imu_acc_y;
+    }
+
+    if (acc_z != NULL)
+    {
+        *acc_z = s_chassis.imu_acc_z;
+    }
+
+    return s_chassis.imu_ready;
 }
 
 bool RSCFChassisServiceAllMotorsOnline(void)

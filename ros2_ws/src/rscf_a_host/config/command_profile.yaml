@@ -1,0 +1,11 @@
+rscf_command_profile:
+  ros__parameters:
+    publish_rate_hz: 50.0
+    mode: step
+    linear_x: 0.35
+    linear_y: 0.0
+    angular_z: 0.25
+    sine_frequency_hz: 0.2
+    send_heading: false
+    heading_deg: 0.0
+    publish_zero_on_shutdown: true

@@ -1,0 +1,104 @@
+diff --git a/rosidl/rosidl_runtime_c/src/string_functions.c b/rosidl/rosidl_runtime_c/src/string_functions.c
+index 15ff4dc..4d78e92 100644
+--- a/rosidl/rosidl_runtime_c/src/string_functions.c
++++ b/rosidl/rosidl_runtime_c/src/string_functions.c
+@@ -16,7 +16,6 @@
+ #include <assert.h>
+ #include <stdlib.h>
+ #include <string.h>
+-#include <stdio.h>
+ 
+ #include <rcutils/allocator.h>
+ #include "rcutils/macros.h"
+@@ -48,25 +47,16 @@ rosidl_runtime_c__String__fini(rosidl_runtime_c__String * str)
+   if (str->data) {
+     /* ensure that data and capacity values are consistent */
+     if (str->capacity <= 0) {
+-      fprintf(
+-        stderr, "Unexpected condition: string capacity was zero for allocated data! "
+-        "Exiting.\n");
+-      exit(-1);
++      abort();
+     }
+     rcutils_allocator_t allocator = rcutils_get_default_allocator();
+     allocator.deallocate(str->data, allocator.state);
+     str->data = NULL;
+     str->size = 0;
+     str->capacity = 0;
+   } else {
+     /* ensure that data, size, and capacity values are consistent */
+     if (0 != str->size) {
+-      fprintf(
+-        stderr, "Unexpected condition: string size was non-zero for deallocated data! "
+-        "Exiting.\n");
+-      exit(-1);
++      abort();
+     }
+     if (0 != str->capacity) {
+-      fprintf(
+-        stderr, "Unexpected behavior: string capacity was non-zero for deallocated data! "
+-        "Exiting.\n");
+-      exit(-1);
++      abort();
+     }
+   }
+ }
+diff --git a/rosidl/rosidl_runtime_c/src/u16string_functions.c b/rosidl/rosidl_runtime_c/src/u16string_functions.c
+index 1757728..28665b5 100644
+--- a/rosidl/rosidl_runtime_c/src/u16string_functions.c
++++ b/rosidl/rosidl_runtime_c/src/u16string_functions.c
+@@ -16,7 +16,6 @@
+ #include <assert.h>
+ #include <stdlib.h>
+ #include <string.h>
+-#include <stdio.h>
+ 
+ #include <rcutils/allocator.h>
+ #include "rcutils/macros.h"
+@@ -48,25 +47,16 @@ rosidl_runtime_c__U16String__fini(rosidl_runtime_c__U16String * str)
+   if (str->data) {
+     /* ensure that data and capacity values are consistent */
+     if (str->capacity <= 0) {
+-      fprintf(
+-        stderr, "Unexpected condition: string capacity was zero for allocated data! "
+-        "Exiting.\n");
+-      exit(-1);
++      abort();
+     }
+     rcutils_allocator_t allocator = rcutils_get_default_allocator();
+     allocator.deallocate(str->data, allocator.state);
+     str->data = NULL;
+     str->size = 0;
+     str->capacity = 0;
+   } else {
+     /* ensure that data, size, and capacity values are consistent */
+     if (0 != str->size) {
+-      fprintf(
+-        stderr, "Unexpected condition: string size was non-zero for deallocated data! "
+-        "Exiting.\n");
+-      exit(-1);
++      abort();
+     }
+     if (0 != str->capacity) {
+-      fprintf(
+-        stderr, "Unexpected behavior: string capacity was non-zero for deallocated data! "
+-        "Exiting.\n");
+-      exit(-1);
++      abort();
+     }
+   }
+ }
+diff --git a/rcl/rcl/src/rcl/rmw_implementation_identifier_check.c b/rcl/rcl/src/rcl/rmw_implementation_identifier_check.c
+index c8c0b76..587e814 100644
+--- a/rcl/rcl/src/rcl/rmw_implementation_identifier_check.c
++++ b/rcl/rcl/src/rcl/rmw_implementation_identifier_check.c
+@@ -157,7 +157,7 @@ cleanup:
+ INITIALIZER(initialize) {
+   rcl_ret_t ret = rcl_rmw_implementation_identifier_check();
+   if (ret != RCL_RET_OK) {
+     RCUTILS_LOG_ERROR_NAMED(ROS_PACKAGE_NAME, "%s\n", rcl_get_error_string().str);
+-    exit(ret);
++    abort();
+   }
+ }
+ 

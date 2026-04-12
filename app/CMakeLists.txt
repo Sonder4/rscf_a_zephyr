@@ -3,9 +3,14 @@ cmake_minimum_required(VERSION 3.20.0)
 list(APPEND BOARD_ROOT ${CMAKE_CURRENT_LIST_DIR}/..)
 list(APPEND DTS_ROOT ${CMAKE_CURRENT_LIST_DIR}/..)
 set(RSCF_SEGGER_MODULE_DIR ${CMAKE_CURRENT_LIST_DIR}/../modules/debug/segger)
+set(RSCF_MICROROS_MODULE_DIR ${CMAKE_CURRENT_LIST_DIR}/../modules/lib/libmicroros)
 
 if(EXISTS ${RSCF_SEGGER_MODULE_DIR}/zephyr/module.yml)
   list(APPEND ZEPHYR_EXTRA_MODULES ${RSCF_SEGGER_MODULE_DIR})
+endif()
+
+if(EXISTS ${RSCF_MICROROS_MODULE_DIR}/zephyr/module.yml)
+  list(APPEND ZEPHYR_EXTRA_MODULES ${RSCF_MICROROS_MODULE_DIR})
 endif()
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
@@ -149,6 +154,7 @@ target_sources(app PRIVATE
   ../modules/rscf/services/rscf_daemon_service.c
   ../modules/rscf/services/rscf_health_service.c
   ../modules/rscf/services/rscf_comm_service.c
+  ../modules/rscf/services/rscf_microros_service.c
   ../modules/rscf/services/rscf_chassis_service.c
   ../modules/rscf/services/rscf_robot_service.c
   ../modules/rscf/services/rscf_ros_bridge.c

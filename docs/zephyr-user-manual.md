@@ -112,30 +112,43 @@
 
 当前项目的 ROS 主路径是：
 
-- MCU 端：`mcu_comm`
+- MCU 端：`micro-ROS`
 - 物理传输：`USB CDC ACM`
-- Host 端：由当前仓库 `mcu_comm/protocol_generator` 生成的 ROS2 包
+- Host 端：当前仓库内 `ros2_ws/src/rscf_a_host`
 
 当前 Host 端已经收口为：
 
-- 仅保留 `USB serial`
-- 不再保留 `CAN/USB2CAN`
-- 不再保留 `TCP` 传输路径
+- `micro_ros_agent serial`
+- `rscf_monitor`
+- `rscf_command_profile`
+- `rscf_host_io.launch.py`
 
-当前没有落地 MCU 端 `micro-ROS`。
+`modules/rscf/services/rscf_ros_bridge.c` 现在明确声明当前 backend 是：
 
-`modules/rscf/services/rscf_ros_bridge.c` 现在只是桥接占位，明确声明当前 backend 是：
+- `RSCF_ROS_BACKEND_MICROROS`
 
-- `RSCF_ROS_BACKEND_MCU_COMM`
+当前默认 topic 约定是：
+
+- 下行：`/cmd_vel`
+- 下行：`/rscf/heading_target_deg`
+- 上行：`/odom`
+- 上行：`/imu/data`
+- 上行：`/rscf/system_status`
+
+其中：
+
+- `/odom` 当前走 reliable publisher
+- `/imu/data` 当前走 best-effort publisher
+- `/rscf/system_status` 当前用于链路状态和功能位解码
 
 ### 2.5 当前工程如何判定“移植是活的”
 
 至少满足以下四点时，可以认为当前 Zephyr 工程主线是活的：
 
-- `cmake --build .workspace/build -j16` 成功
+- `west build -b rscf_a_f427iih6 ../app -d build_microros` 成功
 - 单元测试通过
 - 板子可刷入 `zephyr.hex`
-- 上电后 USB CDC 能稳定枚举，并持续输出 `mcu_comm` 帧流
+- 上电后 USB CDC 能稳定枚举，并能与 `micro_ros_agent` 建链
 
 ---
 
@@ -1271,16 +1284,22 @@ RSCFEventBusConsume(&s_sub, &data, &updated);
 - `mhall`
 - `OLED`
 
-### 9.2 当前 ROS 不是 micro-ROS
+### 9.2 当前 ROS 主链路已经是 micro-ROS
 
-不要把现在的工程理解成：
+这一条已经过期。
 
-- 板子直接跑 ROS2 节点
+当前实际状态是：
 
-当前实际是：
+- 板子运行 `micro-ROS client`
+- Host 侧运行 `micro_ros_agent`
+- 当前仓库内的 `ros2_ws` 负责监控、命令下发和联调入口
 
-- MCU 侧发 `mcu_comm`
-- PC 侧 `ROS2` 节点做协议桥接
+不要把现在的工程继续理解为：
+
+- MCU 侧只发 `mcu_comm`
+- PC 侧再做协议桥接
+
+`mcu_comm` 相关代码和代码生成器仍然保留在仓库中，主要用于兼容旧协议链和继续维护协议资产，但当前 USB 主链路已经切到 `micro-ROS`。
 
 ### 9.3 当前 APP 骨架仍偏底盘主线
 

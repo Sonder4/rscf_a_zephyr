@@ -7,7 +7,7 @@ STM32F427IIH6-based RSCF A controller.
 
 - Zephyr baseline: `v4.3.0`
 - Workspace tool: `west`
-- Standard toolchain: `Zephyr SDK`
+- Standard toolchain: `gnuarmemb` via STM32CubeCLT or `Zephyr SDK`
 - Target board: `rscf_a_f427iih6`
 - Migration style: standalone repository, not an in-place FreeRTOS rewrite
 
@@ -21,6 +21,8 @@ STM32F427IIH6-based RSCF A controller.
 - `scripts/bootstrap/`: workspace and toolchain bootstrap helpers
 - `dts/bindings/rscf/`: custom devicetree bindings
 - `docs/`: migration and bring-up documentation
+- `artifacts/`: locally retained firmware outputs copied out of transient build dirs
+- `ros2_ws/`: host-side ROS 2 workspace for MCU communication and tooling
 
 ## Quick Start
 
@@ -29,6 +31,17 @@ STM32F427IIH6-based RSCF A controller.
 source .venv/bin/activate
 cd .workspace
 west build -b rscf_a_f427iih6 ../app
+```
+
+Host ROS 2 workspace:
+
+```bash
+source /opt/ros/humble/setup.bash
+source /home/xuan/microros_ws/agent_ws/install/setup.bash
+cd /home/xuan/RC2026/STM32/rscf_a_zephyr/ros2_ws
+colcon build
+source install/setup.bash
+ros2 launch rscf_a_host rscf_host_io.launch.py start_agent:=true serial_device:=/dev/ttyACM0
 ```
 
 ## Current Status
@@ -41,14 +54,14 @@ This repository currently provides:
 - migrated RSCF services for `comm`, `chassis`, `motor`, `robot`, `event bus`, `daemon`, `health`, `debug fault`, `ROS bridge`
 - migrated device paths for `Saber IMU UART` and `DTOF2510`
 - migrated compatibility modules for `DJI/DM/servo motor`, `HC05`, `AD7190`, `mhall`, `OLED`, `master_process`, `remote_control`, `robot`, and `robot_cmd`
-- integrated `mcu_comm` code generation path and serial-only host ROS2 package generation
+- integrated `mcu_comm` code generation path and a repo-local host ROS 2 workspace
 - vendored `CMSIS-DSP` source integration replacing the previous local `arm_math` compatibility layer
+- MCU-side `micro-ROS` over USB CDC ACM with host-side monitor/command nodes in `ros2_ws/`
 
 Remaining work is mainly in hardware-depth validation and non-skeleton APP roles:
 
 - `AD7190 / HC05 / mhall / OLED / remote / master_process` are integrated, but still need full real-hardware verification
 - `arm / gimbal / BT` are currently task and state-machine skeletons, not complete actuator applications
-- MCU-side `micro-ROS` is not enabled yet; the current ROS path is `mcu_comm + USB CDC`
 
 ## User Manual
 
@@ -67,3 +80,10 @@ See [docs/zephyr-user-manual.md](docs/zephyr-user-manual.md) for:
 the repository parent directory into a west workspace while still allowing this
 repository to supply the out-of-tree board, DTS bindings, drivers, and app
 sources.
+
+The repository root is the source of truth for all application and migration
+code. `.workspace/manifest` exists only as a west-managed manifest checkout and
+should not be treated as an editable source tree.
+
+If build directories under `.workspace/` are cleaned, the latest manually
+retained firmware images are kept under `artifacts/microros/`.
