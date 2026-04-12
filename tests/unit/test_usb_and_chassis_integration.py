@@ -1,4 +1,6 @@
 from pathlib import Path
+import subprocess
+import textwrap
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -67,3 +69,233 @@ def test_link_runtime_skeleton_is_added_to_build():
     assert "RSCFActionServiceInit" in action_service_c
     assert "RSCFActionServiceProcess" in action_service_c
     assert "runtime->handled_events >= runtime->last_event_sequence" in action_service_c
+
+
+def test_link_runtime_skeleton_exercises_poll_router_action_path(tmp_path):
+    stub_root = tmp_path / "stubs"
+    (stub_root / "zephyr" / "logging").mkdir(parents=True)
+    (stub_root / "zephyr" / "sys").mkdir(parents=True)
+    (stub_root / "zephyr").mkdir(exist_ok=True)
+
+    (stub_root / "zephyr" / "kernel.h").write_text(
+        textwrap.dedent(
+            """
+            #ifndef ZEPHYR_KERNEL_H_
+            #define ZEPHYR_KERNEL_H_
+            #include <stddef.h>
+            #include <stdint.h>
+            #include <string.h>
+
+            #define K_NO_WAIT 0
+            #define K_MSEC(ms) (ms)
+            #define APPLICATION 0
+            #define CONFIG_APPLICATION_INIT_PRIORITY 0
+            #define ARG_UNUSED(x) (void)(x)
+
+            struct k_work {
+                void *unused;
+            };
+
+            struct k_work_delayable {
+                struct k_work work;
+                void (*handler)(struct k_work *work);
+            };
+
+            struct k_msgq {
+                char *buffer;
+                size_t msg_size;
+                uint32_t max_msgs;
+                uint32_t used_msgs;
+            };
+
+            static int stub_in_work_handler;
+
+            static inline void k_work_init_delayable(struct k_work_delayable *work,
+                                                     void (*handler)(struct k_work *work))
+            {
+                work->handler = handler;
+            }
+
+            static inline int k_work_reschedule(struct k_work_delayable *work, int delay)
+            {
+                ARG_UNUSED(delay);
+                if ((work->handler != NULL) && (stub_in_work_handler == 0)) {
+                    stub_in_work_handler = 1;
+                    work->handler(&work->work);
+                    stub_in_work_handler = 0;
+                }
+                return 0;
+            }
+
+            static inline void k_msgq_init(struct k_msgq *queue,
+                                           char *buffer,
+                                           size_t msg_size,
+                                           uint32_t max_msgs)
+            {
+                queue->buffer = buffer;
+                queue->msg_size = msg_size;
+                queue->max_msgs = max_msgs;
+                queue->used_msgs = 0;
+            }
+
+            static inline int k_msgq_put(struct k_msgq *queue, const void *data, int timeout)
+            {
+                ARG_UNUSED(timeout);
+                if (queue->used_msgs >= queue->max_msgs) {
+                    return -1;
+                }
+
+                memcpy(queue->buffer + (queue->used_msgs * queue->msg_size), data, queue->msg_size);
+                queue->used_msgs++;
+                return 0;
+            }
+
+            static inline int k_msgq_get(struct k_msgq *queue, void *data, int timeout)
+            {
+                ARG_UNUSED(timeout);
+                if (queue->used_msgs == 0U) {
+                    return -1;
+                }
+
+                memcpy(data, queue->buffer, queue->msg_size);
+                if (queue->used_msgs > 1U) {
+                    memmove(queue->buffer,
+                            queue->buffer + queue->msg_size,
+                            (queue->used_msgs - 1U) * queue->msg_size);
+                }
+                queue->used_msgs--;
+                return 0;
+            }
+            #endif
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    (stub_root / "zephyr" / "sys" / "ring_buffer.h").write_text(
+        textwrap.dedent(
+            """
+            #ifndef ZEPHYR_SYS_RING_BUFFER_H_
+            #define ZEPHYR_SYS_RING_BUFFER_H_
+            #include <stdint.h>
+            #include <string.h>
+
+            struct ring_buf {
+                uint8_t *buffer;
+                uint32_t size;
+                uint32_t head;
+                uint32_t tail;
+            };
+
+            static inline void ring_buf_init(struct ring_buf *ring, uint32_t size, uint8_t *buffer)
+            {
+                ring->buffer = buffer;
+                ring->size = size;
+                ring->head = 0U;
+                ring->tail = 0U;
+            }
+
+            #endif
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    (stub_root / "zephyr" / "logging" / "log.h").write_text(
+        textwrap.dedent(
+            """
+            #ifndef ZEPHYR_LOGGING_LOG_H_
+            #define ZEPHYR_LOGGING_LOG_H_
+            #define LOG_MODULE_REGISTER(name, level)
+            #define LOG_INF(...)
+            #define LOG_DBG(...)
+            #endif
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    (stub_root / "zephyr" / "sys" / "util.h").write_text(
+        textwrap.dedent(
+            """
+            #ifndef ZEPHYR_SYS_UTIL_H_
+            #define ZEPHYR_SYS_UTIL_H_
+            #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
+            #endif
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    (stub_root / "zephyr" / "init.h").write_text(
+        textwrap.dedent(
+            """
+            #ifndef ZEPHYR_INIT_H_
+            #define ZEPHYR_INIT_H_
+            #define SYS_INIT(fn, level, prio)
+            #endif
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    harness_c = tmp_path / "runtime_harness.c"
+    harness_c.write_text(
+        textwrap.dedent(
+            """
+            #include "rscf_link_service.h"
+
+            int main(void)
+            {
+                struct rscf_link_runtime *runtime;
+
+                if (RSCFLinkServiceInit() != 0) {
+                    return 1;
+                }
+
+                runtime = RSCFLinkServiceGetRuntime();
+                if ((runtime == 0) || !runtime->ready) {
+                    return 2;
+                }
+
+                if (runtime->scheduled_events == 0U) {
+                    return 3;
+                }
+
+                if (runtime->last_event_sequence == 0U) {
+                    return 4;
+                }
+
+                if (runtime->handled_events == 0U) {
+                    return 5;
+                }
+
+                RSCFLinkServiceProcess();
+                if (runtime->handled_events == 0U) {
+                    return 6;
+                }
+
+                return 0;
+            }
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    binary = tmp_path / "runtime_harness"
+    service_dir = REPO_ROOT / "modules" / "rscf" / "services"
+    compile_cmd = [
+        "gcc",
+        "-std=c11",
+        f"-I{stub_root}",
+        f"-I{service_dir}",
+        str(harness_c),
+        str(service_dir / "rscf_link_service.c"),
+        str(service_dir / "rscf_service_router.c"),
+        str(service_dir / "rscf_action_service.c"),
+        "-o",
+        str(binary),
+    ]
+
+    subprocess.run(compile_cmd, check=True, cwd=REPO_ROOT)
+    subprocess.run([str(binary)], check=True, cwd=REPO_ROOT)
