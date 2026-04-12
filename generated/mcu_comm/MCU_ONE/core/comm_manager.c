@@ -43,9 +43,35 @@ static uint16_t batch_len = 0;
 static uint32_t s_callback_count[256] = {0};
 static uint32_t s_total_callback_count = 0;
 
+static Transport_interface_t* Comm_SelectDefaultTransport(void)
+{
+#if MCU_COMM_DEFAULT_TRANSPORT == MCU_COMM_TRANSPORT_CAN
+    return &g_can_transport;
+#elif MCU_COMM_DEFAULT_TRANSPORT == MCU_COMM_TRANSPORT_UART
+    return &g_uart_transport;
+#else
+    return &g_usb_transport;
+#endif
+}
+
 __attribute__((weak)) void Comm_OnValidRxFrame(uint8_t pid)
 {
     (void)pid;
+}
+
+__attribute__((weak)) Transport_interface_t* Comm_ResolveTransportOrDefault(Transport_interface_t* transport)
+{
+    return transport;
+}
+
+__attribute__((weak)) void Comm_OnTransportResolved(Transport_interface_t* transport)
+{
+    ARG_UNUSED(transport);
+}
+
+__attribute__((weak)) uint16_t Comm_CompatMapEndpoint(uint8_t pid)
+{
+    return (uint16_t)pid;
 }
 
 int Comm_Init(Transport_interface_t* transport)
@@ -55,14 +81,11 @@ int Comm_Init(Transport_interface_t* transport)
     g_transport = transport;
     if (g_transport == NULL)
     {
-#if MCU_COMM_DEFAULT_TRANSPORT == MCU_COMM_TRANSPORT_CAN
-        g_transport = &g_can_transport;
-#elif MCU_COMM_DEFAULT_TRANSPORT == MCU_COMM_TRANSPORT_UART
-        g_transport = &g_uart_transport;
-#else
-        g_transport = &g_usb_transport;
-#endif
+        g_transport = Comm_SelectDefaultTransport();
     }
+
+    g_transport = Comm_ResolveTransportOrDefault(g_transport);
+    Comm_OnTransportResolved(g_transport);
 
     if ((g_transport != NULL) && (g_transport->init != NULL))
     {
@@ -188,6 +211,8 @@ void Comm_ProcessRx(void)
             if (status == 3)
             {
                 uint8_t pid = rx_frame.pid;
+                uint16_t compat_endpoint = Comm_CompatMapEndpoint(pid);
+                ARG_UNUSED(compat_endpoint);
                 Comm_OnValidRxFrame(pid);
                 if (pid_registry[pid].callback != NULL)
                 {

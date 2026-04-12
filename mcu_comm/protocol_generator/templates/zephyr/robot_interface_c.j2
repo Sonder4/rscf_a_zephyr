@@ -28,6 +28,7 @@ static bool g_is_initialized = false;
 static void* s_robot_tx_task_handle = NULL;
 static uint32_t s_pending_tx_events;
 static Transport_interface_t* s_transport_override = NULL;
+static Transport_interface_t* s_transport_resolved = NULL;
 
 __attribute__((weak)) void RobotInterfaceTxPeriodicHook(void)
 {
@@ -37,6 +38,45 @@ __attribute__((weak)) void RobotInterfaceTxEventHook(uint32_t tx_events)
 {
     ARG_UNUSED(tx_events);
 }
+
+__attribute__((weak)) Transport_interface_t* RobotInterfaceResolveTransportOverride(Transport_interface_t* transport)
+{
+    return transport;
+}
+
+__attribute__((weak)) void RobotInterfaceOnTransportReady(Transport_interface_t* transport)
+{
+    ARG_UNUSED(transport);
+}
+
+__attribute__((weak)) void RobotInterfaceFillCompatSystemStatus(uint8_t *control_plane_bytes, uint16_t len)
+{
+    ARG_UNUSED(control_plane_bytes);
+    ARG_UNUSED(len);
+}
+
+__attribute__((weak)) void RobotInterfaceOnCompatSystemCmd(const uint8_t *control_plane_bytes, uint16_t len)
+{
+    ARG_UNUSED(control_plane_bytes);
+    ARG_UNUSED(len);
+}
+
+{% for packet in packets %}
+{% if packet.name == 'SYSTEM_CMD' and (packet.direction == 'pc_to_mcu' or packet.direction == 'bidirectional') %}
+static void RobotInterfaceCompatSystemCmdCallback(void* data)
+{
+    systemCmd_t *cmd = (systemCmd_t*)data;
+
+    if (cmd != NULL)
+    {
+        RobotInterfaceOnCompatSystemCmd(cmd->cmd_bytes, sizeof(cmd->cmd_bytes));
+    }
+
+    SystemCmdCallback(data);
+}
+
+{% endif %}
+{% endfor %}
 
 #if MCU_COMM_TEST_MODE
 static uint32_t RobotInterfaceGetTickMs(void)
@@ -55,15 +95,21 @@ bool RobotInterfaceInit(void)
     }
 
     PID_Registry_Init();
-    ret = Comm_Init(s_transport_override);
+    s_transport_resolved = RobotInterfaceResolveTransportOverride(s_transport_override);
+    ret = Comm_Init(s_transport_resolved);
     if (ret != 0)
     {
         return false;
     }
+    RobotInterfaceOnTransportReady(s_transport_resolved);
 
 {% for packet in packets %}
 {% if packet.direction == 'pc_to_mcu' or packet.direction == 'bidirectional' %}
+{% if packet.name == 'SYSTEM_CMD' %}
+    PID_RegisterCallback(PID_{{ packet.name | to_upper_snake }}, RobotInterfaceCompatSystemCmdCallback);
+{% else %}
     PID_RegisterCallback(PID_{{ packet.name | to_upper_snake }}, {{ packet.name | to_pascal_case }}Callback);
+{% endif %}
 {% endif %}
 {% endfor %}
 
@@ -75,6 +121,7 @@ void RobotInterfaceDeinit(void)
 {
     g_is_initialized = false;
     s_pending_tx_events = 0U;
+    s_transport_resolved = NULL;
 }
 
 void RobotInterfaceSetTransport(Transport_interface_t* transport)
@@ -112,6 +159,10 @@ bool RobotSend{{ packet.name | to_pascal_case }}(const uint8_t *control_plane_by
                control_plane_bytes,
                sizeof(data.{{ packet.control_plane_bytes_field_name }}));
     }
+{% if packet.name == 'SYSTEM_STATUS' %}
+    RobotInterfaceFillCompatSystemStatus(data.{{ packet.control_plane_bytes_field_name }},
+                                         sizeof(data.{{ packet.control_plane_bytes_field_name }}));
+{% endif %}
 
     Comm_Send(DEVICE_MID, PID_{{ packet.name | to_upper_snake }}, (uint8_t*)&data, sizeof(data));
     return true;

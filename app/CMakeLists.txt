@@ -122,6 +122,10 @@ target_sources(app PRIVATE
   ../drivers/bsp/bsp_tim.c
   ../drivers/rscf/rscf_boot.c
   ../drivers/rscf/rscf_led_status.c
+  ../drivers/rscf/rscf_link_usb.c
+  ../drivers/rscf/rscf_link_uart.c
+  ../drivers/rscf/rscf_link_can.c
+  ../drivers/rscf/rscf_link_spi.c
   ../drivers/rscf/rscf_ext_uart_mux.c
   ../drivers/rscf/rscf_buzzer.c
   ../drivers/rscf/rscf_power_switch.c
