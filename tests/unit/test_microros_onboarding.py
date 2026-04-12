@@ -118,9 +118,8 @@ def test_libmicroros_build_flow_has_repeatable_rcutils_patch_step() -> None:
     assert "patch_vendor_sources" in libmicroros_mk
     assert "patch_microros_sources.sh" in libmicroros_mk
     assert "sanitize_microros_env.sh" in libmicroros_mk
-    assert "rosidl_dynamic_typesupport/COLCON_IGNORE" in libmicroros_mk
-    assert 'link_or_clone "$(MICROROS_LOCAL_MCU_WS)/ros2/rosidl_dynamic_typesupport"' not in libmicroros_mk
-    assert 'link_or_clone "$(MICROROS_LOCAL_MCU_WS)/ros2/rosidl_core"' not in libmicroros_mk
+    assert 'link_or_clone "$(MICROROS_LOCAL_MCU_WS)/ros2/rosidl_dynamic_typesupport" rosidl_dynamic_typesupport jazzy https://github.com/ros2/rosidl_dynamic_typesupport;' in libmicroros_mk
+    assert 'link_or_clone "$(MICROROS_LOCAL_MCU_WS)/ros2/rosidl_core" rosidl_core jazzy https://github.com/ros2/rosidl_core;' in libmicroros_mk
     assert "ROSIDL_TYPESUPPORT_SINGLE_TYPESUPPORT=ON" in colcon_meta
     assert "MICROROS_DEV_PACKAGES" in libmicroros_mk
     assert "MICROROS_PYTHON ?= $(if $(VIRTUAL_ENV),$(VIRTUAL_ENV)/bin/python3,/usr/bin/python3)" in libmicroros_mk
@@ -149,7 +148,8 @@ def test_libmicroros_build_flow_has_repeatable_rcutils_patch_step() -> None:
     assert "fix_embedded_exit_sources" in patch_script
     assert "s/exit(-1);/abort();/g" in patch_script
     assert "disable_optional_packages" in patch_script
-    assert "rosidl_core/COLCON_IGNORE" in patch_script
+    assert "rosidl_dynamic_typesupport/COLCON_IGNORE" not in patch_script
+    assert "rosidl_core/COLCON_IGNORE" not in patch_script
     assert "sync_time_unix_template" in patch_script
     assert "rcutils_time_unix_zephyr.c" in patch_script
     assert "RCUTILS_MS_TO_NS((int64_t)k_uptime_get())" in time_template

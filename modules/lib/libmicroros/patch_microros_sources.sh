@@ -99,9 +99,6 @@ sync_time_unix_template() {
 
 disable_optional_packages() {
     local src_dir="$1"
-
-    touch "${src_dir}/rosidl_dynamic_typesupport/COLCON_IGNORE" 2>/dev/null || true
-    touch "${src_dir}/rosidl_core/COLCON_IGNORE" 2>/dev/null || true
 }
 
 ensure_local_copy "${src_root}/rcutils"

@@ -132,6 +132,8 @@ $(COMPONENT_PATH)/micro_ros_src/src:
 	link_or_clone "$(MICROROS_LOCAL_MCU_WS)/uros/rosidl_typesupport" rosidl_typesupport jazzy https://github.com/micro-ROS/rosidl_typesupport; \
 	link_or_clone "$(MICROROS_LOCAL_MCU_WS)/uros/rosidl_typesupport_microxrcedds" rosidl_typesupport_microxrcedds jazzy https://github.com/micro-ROS/rosidl_typesupport_microxrcedds; \
 	link_or_clone "$(MICROROS_LOCAL_MCU_WS)/ros2/rosidl" rosidl jazzy https://github.com/ros2/rosidl; \
+	link_or_clone "$(MICROROS_LOCAL_MCU_WS)/ros2/rosidl_dynamic_typesupport" rosidl_dynamic_typesupport jazzy https://github.com/ros2/rosidl_dynamic_typesupport; \
+	link_or_clone "$(MICROROS_LOCAL_MCU_WS)/ros2/rosidl_core" rosidl_core jazzy https://github.com/ros2/rosidl_core; \
 	link_or_clone "$(MICROROS_LOCAL_MCU_WS)/ros2/rmw" rmw jazzy https://github.com/ros2/rmw; \
 	link_or_clone "$(MICROROS_LOCAL_MCU_WS)/ros2/rcl_interfaces" rcl_interfaces jazzy https://github.com/ros2/rcl_interfaces; \
 	link_or_clone "$(MICROROS_LOCAL_MCU_WS)/ros2/rosidl_defaults" rosidl_defaults jazzy https://github.com/ros2/rosidl_defaults; \
@@ -144,7 +146,6 @@ $(COMPONENT_PATH)/micro_ros_src/src:
 	link_or_clone "$(MICROROS_LOCAL_MCU_WS)/uros/micro_ros_utilities" micro_ros_utilities jazzy https://github.com/micro-ROS/micro_ros_utilities; \
 	touch ros2_tracing/test_tracetools/COLCON_IGNORE 2>/dev/null || true; \
 	touch ros2_tracing/lttngpy/COLCON_IGNORE 2>/dev/null || true; \
-	touch rosidl_dynamic_typesupport/COLCON_IGNORE 2>/dev/null || true; \
     touch rosidl/rosidl_typesupport_introspection_cpp/COLCON_IGNORE 2>/dev/null || true; \
     touch rclc/rclc_examples/COLCON_IGNORE 2>/dev/null || true; \
     touch common_interfaces/actionlib_msgs/COLCON_IGNORE 2>/dev/null || true; \
