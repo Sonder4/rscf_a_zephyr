@@ -1,0 +1,633 @@
+{
+  "metadata": {
+    "generated_at": "2026-02-12T16:07:58.511272",
+    "description": "GPIO引脚配置"
+  },
+  "pins": {
+    "PA0/WKUP": {
+      "name": "PA0/WKUP",
+      "signal": "S_TIM2_CH1_ETR",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PA1": {
+      "name": "PA1",
+      "signal": "S_TIM2_CH2",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PA11": {
+      "name": "PA11",
+      "signal": "USB_OTG_FS_DM",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PA12": {
+      "name": "PA12",
+      "signal": "USB_OTG_FS_DP",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PA13": {
+      "name": "PA13",
+      "signal": "SYS_JTMS-SWDIO",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PA14": {
+      "name": "PA14",
+      "signal": "SYS_JTCK-SWCLK",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PA2": {
+      "name": "PA2",
+      "signal": "S_TIM2_CH3",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PA3": {
+      "name": "PA3",
+      "signal": "S_TIM2_CH4",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PB12": {
+      "name": "PB12",
+      "signal": "CAN2_RX",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PB13": {
+      "name": "PB13",
+      "signal": "CAN2_TX",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PB2/BOOT1": {
+      "name": "PB2/BOOT1",
+      "signal": "GPXTI2",
+      "mode": "Unknown",
+      "label": "Key",
+      "locked": true
+    },
+    "PB6": {
+      "name": "PB6",
+      "signal": "USART1_TX",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PB7": {
+      "name": "PB7",
+      "signal": "USART1_RX",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PD0": {
+      "name": "PD0",
+      "signal": "CAN1_RX",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PD1": {
+      "name": "PD1",
+      "signal": "CAN1_TX",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PD12": {
+      "name": "PD12",
+      "signal": "S_TIM4_CH1",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PD13": {
+      "name": "PD13",
+      "signal": "S_TIM4_CH2",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PD14": {
+      "name": "PD14",
+      "signal": "S_TIM4_CH3",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PD15": {
+      "name": "PD15",
+      "signal": "S_TIM4_CH4",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PD5": {
+      "name": "PD5",
+      "signal": "USART2_TX",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PD6": {
+      "name": "PD6",
+      "signal": "USART2_RX",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PD8": {
+      "name": "PD8",
+      "signal": "USART3_TX",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PD9": {
+      "name": "PD9",
+      "signal": "USART3_RX",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PE0": {
+      "name": "PE0",
+      "signal": "UART8_RX",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PE1": {
+      "name": "PE1",
+      "signal": "UART8_TX",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PE12": {
+      "name": "PE12",
+      "signal": "SPI4_SCK",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PE15": {
+      "name": "PE15",
+      "signal": "GPIO_Input",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PE4": {
+      "name": "PE4",
+      "signal": "SPI4_NSS",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PE5": {
+      "name": "PE5",
+      "signal": "SPI4_MISO",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PE6": {
+      "name": "PE6",
+      "signal": "SPI4_MOSI",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PE7": {
+      "name": "PE7",
+      "signal": "UART7_RX",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PE8": {
+      "name": "PE8",
+      "signal": "UART7_TX",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PF0": {
+      "name": "PF0",
+      "signal": "I2C2_SDA",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PF1": {
+      "name": "PF1",
+      "signal": "I2C2_SCL",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PF14": {
+      "name": "PF14",
+      "signal": "GPIO_Output",
+      "mode": "Unknown",
+      "label": "LED_G",
+      "locked": true
+    },
+    "PF6": {
+      "name": "PF6",
+      "signal": "SPI5_NSS",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PF7": {
+      "name": "PF7",
+      "signal": "SPI5_SCK",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PF8": {
+      "name": "PF8",
+      "signal": "SPI5_MISO",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PF9": {
+      "name": "PF9",
+      "signal": "SPI5_MOSI",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PG1": {
+      "name": "PG1",
+      "signal": "GPIO_Output",
+      "mode": "Unknown",
+      "label": "LED1",
+      "locked": true,
+      "initial_state": "GPIO_PIN_SET"
+    },
+    "PG13": {
+      "name": "PG13",
+      "signal": "GPIO_Output",
+      "mode": "Unknown",
+      "label": "",
+      "locked": true
+    },
+    "PG14": {
+      "name": "PG14",
+      "signal": "USART6_TX",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PG2": {
+      "name": "PG2",
+      "signal": "GPIO_Output",
+      "mode": "Unknown",
+      "label": "LED2",
+      "locked": true,
+      "initial_state": "GPIO_PIN_SET"
+    },
+    "PG3": {
+      "name": "PG3",
+      "signal": "GPIO_Output",
+      "mode": "Unknown",
+      "label": "LED3",
+      "locked": true,
+      "initial_state": "GPIO_PIN_SET"
+    },
+    "PG4": {
+      "name": "PG4",
+      "signal": "GPIO_Output",
+      "mode": "Unknown",
+      "label": "LED4",
+      "locked": true,
+      "initial_state": "GPIO_PIN_SET"
+    },
+    "PG5": {
+      "name": "PG5",
+      "signal": "GPIO_Output",
+      "mode": "Unknown",
+      "label": "LED5",
+      "locked": true,
+      "initial_state": "GPIO_PIN_SET"
+    },
+    "PG6": {
+      "name": "PG6",
+      "signal": "GPIO_Output",
+      "mode": "Unknown",
+      "label": "LED6",
+      "locked": true,
+      "initial_state": "GPIO_PIN_SET"
+    },
+    "PG7": {
+      "name": "PG7",
+      "signal": "GPIO_Output",
+      "mode": "Unknown",
+      "label": "LED7",
+      "locked": true,
+      "initial_state": "GPIO_PIN_SET"
+    },
+    "PG8": {
+      "name": "PG8",
+      "signal": "GPIO_Output",
+      "mode": "Unknown",
+      "label": "LED8",
+      "locked": true,
+      "initial_state": "GPIO_PIN_SET"
+    },
+    "PG9": {
+      "name": "PG9",
+      "signal": "USART6_RX",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PH0/OSC_IN": {
+      "name": "PH0/OSC_IN",
+      "signal": "RCC_OSC_IN",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PH1/OSC_OUT": {
+      "name": "PH1/OSC_OUT",
+      "signal": "RCC_OSC_OUT",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PH10": {
+      "name": "PH10",
+      "signal": "S_TIM5_CH1",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PH11": {
+      "name": "PH11",
+      "signal": "S_TIM5_CH2",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PH12": {
+      "name": "PH12",
+      "signal": "S_TIM5_CH3",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PH2": {
+      "name": "PH2",
+      "signal": "GPIO_Output",
+      "mode": "Unknown",
+      "label": "POWER1",
+      "locked": true
+    },
+    "PH3": {
+      "name": "PH3",
+      "signal": "GPIO_Output",
+      "mode": "Unknown",
+      "label": "POWER2",
+      "locked": true
+    },
+    "PH4": {
+      "name": "PH4",
+      "signal": "GPIO_Output",
+      "mode": "Unknown",
+      "label": "POWER3",
+      "locked": true
+    },
+    "PH5": {
+      "name": "PH5",
+      "signal": "GPIO_Output",
+      "mode": "Unknown",
+      "label": "POWER4",
+      "locked": true
+    },
+    "PH6": {
+      "name": "PH6",
+      "signal": "S_TIM12_CH1",
+      "mode": "Unknown",
+      "label": "BUZZER",
+      "locked": false
+    },
+    "PI0": {
+      "name": "PI0",
+      "signal": "S_TIM5_CH4",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PI2": {
+      "name": "PI2",
+      "signal": "S_TIM8_CH4",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PI5": {
+      "name": "PI5",
+      "signal": "S_TIM8_CH1",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PI6": {
+      "name": "PI6",
+      "signal": "S_TIM8_CH2",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "PI7": {
+      "name": "PI7",
+      "signal": "S_TIM8_CH3",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "VP_CRC_VS_CRC": {
+      "name": "VP_CRC_VS_CRC",
+      "signal": "CRC_VS_CRC",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "VP_FREERTOS_VS_CMSIS_V2": {
+      "name": "VP_FREERTOS_VS_CMSIS_V2",
+      "signal": "FREERTOS_VS_CMSIS_V2",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "VP_RNG_VS_RNG": {
+      "name": "VP_RNG_VS_RNG",
+      "signal": "RNG_VS_RNG",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "VP_RTC_VS_RTC_Activate": {
+      "name": "VP_RTC_VS_RTC_Activate",
+      "signal": "RTC_VS_RTC_Activate",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "VP_SYS_VS_tim14": {
+      "name": "VP_SYS_VS_tim14",
+      "signal": "SYS_VS_tim14",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "VP_TIM12_VS_ClockSourceINT": {
+      "name": "VP_TIM12_VS_ClockSourceINT",
+      "signal": "TIM12_VS_ClockSourceINT",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "VP_TIM2_VS_ClockSourceINT": {
+      "name": "VP_TIM2_VS_ClockSourceINT",
+      "signal": "TIM2_VS_ClockSourceINT",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "VP_TIM4_VS_ClockSourceINT": {
+      "name": "VP_TIM4_VS_ClockSourceINT",
+      "signal": "TIM4_VS_ClockSourceINT",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "VP_TIM5_VS_ClockSourceINT": {
+      "name": "VP_TIM5_VS_ClockSourceINT",
+      "signal": "TIM5_VS_ClockSourceINT",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "VP_TIM8_VS_ClockSourceINT": {
+      "name": "VP_TIM8_VS_ClockSourceINT",
+      "signal": "TIM8_VS_ClockSourceINT",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    },
+    "VP_USB_DEVICE_VS_USB_DEVICE_CDC_FS": {
+      "name": "VP_USB_DEVICE_VS_USB_DEVICE_CDC_FS",
+      "signal": "USB_DEVICE_VS_USB_DEVICE_CDC_FS",
+      "mode": "Unknown",
+      "label": "",
+      "locked": false
+    }
+  },
+  "groups": {
+    "output": [
+      "PF14",
+      "PG1",
+      "PG13",
+      "PG2",
+      "PG3",
+      "PG4",
+      "PG5",
+      "PG6",
+      "PG7",
+      "PG8",
+      "PH2",
+      "PH3",
+      "PH4",
+      "PH5"
+    ],
+    "input": [
+      "PE15"
+    ],
+    "alternate": [
+      "PA0/WKUP",
+      "PA1",
+      "PA11",
+      "PA12",
+      "PA13",
+      "PA14",
+      "PA2",
+      "PA3",
+      "PB12",
+      "PB13",
+      "PB2/BOOT1",
+      "PB6",
+      "PB7",
+      "PD0",
+      "PD1",
+      "PD12",
+      "PD13",
+      "PD14",
+      "PD15",
+      "PD5",
+      "PD6",
+      "PD8",
+      "PD9",
+      "PE0",
+      "PE1",
+      "PE12",
+      "PE4",
+      "PE5",
+      "PE6",
+      "PE7",
+      "PE8",
+      "PF0",
+      "PF1",
+      "PF6",
+      "PF7",
+      "PF8",
+      "PF9",
+      "PG14",
+      "PG9",
+      "PH0/OSC_IN",
+      "PH1/OSC_OUT",
+      "PH10",
+      "PH11",
+      "PH12",
+      "PH6",
+      "PI0",
+      "PI2",
+      "PI5",
+      "PI6",
+      "PI7",
+      "VP_CRC_VS_CRC",
+      "VP_FREERTOS_VS_CMSIS_V2",
+      "VP_RNG_VS_RNG",
+      "VP_RTC_VS_RTC_Activate",
+      "VP_SYS_VS_tim14",
+      "VP_TIM12_VS_ClockSourceINT",
+      "VP_TIM2_VS_ClockSourceINT",
+      "VP_TIM4_VS_ClockSourceINT",
+      "VP_TIM5_VS_ClockSourceINT",
+      "VP_TIM8_VS_ClockSourceINT",
+      "VP_USB_DEVICE_VS_USB_DEVICE_CDC_FS"
+    ],
+    "analog": []
+  }
+}

@@ -1,0 +1,189 @@
+{
+  "metadata": {
+    "generated_at": "2026-02-12T16:07:58.511272",
+    "description": "NVIC中断配置"
+  },
+  "priority_group": "NVIC_PRIORITYGROUP_4",
+  "interrupts": {
+    "BusFault_IRQn": {
+      "enabled": true,
+      "preemption_priority": 0,
+      "sub_priority": 0
+    },
+    "CAN1_RX0_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "CAN1_RX1_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "CAN2_RX0_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "CAN2_RX1_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "DMA1_Stream0_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "DMA1_Stream1_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "DMA1_Stream2_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "DMA1_Stream3_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "DMA1_Stream4_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "DMA1_Stream5_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "DMA1_Stream6_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "DMA1_Stream7_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "DMA2_Stream2_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "DMA2_Stream4_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "DMA2_Stream5_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "DebugMonitor_IRQn": {
+      "enabled": true,
+      "preemption_priority": 0,
+      "sub_priority": 0
+    },
+    "HardFault_IRQn": {
+      "enabled": true,
+      "preemption_priority": 0,
+      "sub_priority": 0
+    },
+    "I2C2_ER_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "I2C2_EV_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "MemoryManagement_IRQn": {
+      "enabled": true,
+      "preemption_priority": 0,
+      "sub_priority": 0
+    },
+    "NonMaskableInt_IRQn": {
+      "enabled": true,
+      "preemption_priority": 0,
+      "sub_priority": 0
+    },
+    "OTG_FS_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "PendSV_IRQn": {
+      "enabled": true,
+      "preemption_priority": 15,
+      "sub_priority": 0
+    },
+    "SPI4_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "SPI5_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "SVCall_IRQn": {
+      "enabled": true,
+      "preemption_priority": 0,
+      "sub_priority": 0
+    },
+    "SysTick_IRQn": {
+      "enabled": true,
+      "preemption_priority": 15,
+      "sub_priority": 0
+    },
+    "TIM8_TRG_COM_TIM14_IRQn": {
+      "enabled": true,
+      "preemption_priority": 15,
+      "sub_priority": 0
+    },
+    "UART7_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "UART8_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "USART1_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "USART2_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "USART3_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "USART6_IRQn": {
+      "enabled": true,
+      "preemption_priority": 5,
+      "sub_priority": 0
+    },
+    "UsageFault_IRQn": {
+      "enabled": true,
+      "preemption_priority": 0,
+      "sub_priority": 0
+    }
+  }
+}

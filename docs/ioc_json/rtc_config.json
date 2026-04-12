@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "generated_at": "2026-02-12T16:07:58.512276",
+    "description": "RTC实时时钟配置"
+  },
+  "enabled": true,
+  "parameters": {
+    "IPParameters": "SynchPrediv",
+    "SynchPrediv": "3199"
+  }
+}

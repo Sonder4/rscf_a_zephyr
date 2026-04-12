@@ -15,6 +15,7 @@
 #include "rscf_ext_uart_mux.h"
 #include "rscf_imu_uart.h"
 #include "rscf_led_status.h"
+#include "rscf_power_switch.h"
 
 LOG_MODULE_REGISTER(rscf_profile, LOG_LEVEL_INF);
 
@@ -31,6 +32,13 @@ int RSCFAppProfileInit(void)
 
 #if defined(CONFIG_RSCF_EXT_UART_MUX)
   ret = RSCFExtUartMuxInit();
+  if (ret != 0) {
+    return ret;
+  }
+#endif
+
+#if defined(CONFIG_RSCF_POWER_SWITCH)
+  ret = RSCFPowerSwitchInit();
   if (ret != 0) {
     return ret;
   }

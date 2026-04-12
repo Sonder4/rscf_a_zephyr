@@ -15,9 +15,14 @@
 #define SERVO_PWM_CONTROL_STEP_DEG 1.0f
 #define SERVO_PWM_CONTROL_TASK_PERIOD_MS 10U
 
+#ifndef RSCF_PWM_INSTANCE_FWD_DECLARED
+#define RSCF_PWM_INSTANCE_FWD_DECLARED
 typedef struct pwm_instance PWMInstance;
+#endif
 typedef struct usart_instance USARTInstance;
 
+#ifndef RSCF_PWM_INIT_CONFIG_S_DEFINED
+#define RSCF_PWM_INIT_CONFIG_S_DEFINED
 typedef struct
 {
     void *htim;
@@ -27,6 +32,7 @@ typedef struct
     void (*callback)(void *);
     void *id;
 } PWM_Init_Config_s;
+#endif
 
 typedef enum
 {

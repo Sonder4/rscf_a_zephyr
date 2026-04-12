@@ -1,0 +1,36 @@
+{
+  "metadata": {
+    "generated_at": "2026-02-12T16:07:58.506720",
+    "description": "RCC时钟树配置"
+  },
+  "system_clock": {
+    "source": "RCC_SYSCLKSOURCE_PLLCLK",
+    "frequency_mhz": 168.0
+  },
+  "bus_clocks": {
+    "sysclk_freq_hz": 168000000,
+    "hclk_freq_hz": 168000000,
+    "ahb_freq_hz": 168000000,
+    "apb1_freq_hz": 42000000,
+    "apb2_freq_hz": 84000000,
+    "apb1_tim_freq_hz": 84000000,
+    "apb2_tim_freq_hz": 168000000,
+    "cortex_freq_hz": 168000000,
+    "usb_48mhz_freq_hz": 48000000
+  },
+  "pll_config": {
+    "pll_m": 6,
+    "pll_n": 168,
+    "pll_q": 7,
+    "pll_clk_freq_hz": 168000000,
+    "vco_input_freq_hz": 2000000,
+    "vco_output_freq_hz": 336000000
+  },
+  "oscillator": {
+    "hse_freq_hz": 12000000,
+    "hsi_freq_hz": 16000000,
+    "lse_freq_hz": 32768,
+    "lsi_freq_hz": 32000,
+    "sysclk_source": "RCC_SYSCLKSOURCE_PLLCLK"
+  }
+}

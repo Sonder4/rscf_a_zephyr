@@ -6,10 +6,22 @@
 #include <zephyr/sys/util.h>
 
 #include <stm32f4xx_hal_can.h>
+#include <stm32f4xx_hal_gpio.h>
+#include <stm32f4xx_hal_spi.h>
+#include <stm32f4xx_hal_tim.h>
 #include <stm32f4xx_hal_uart.h>
 
 extern CAN_HandleTypeDef hcan1;
 extern CAN_HandleTypeDef hcan2;
+
+extern SPI_HandleTypeDef hspi4;
+extern SPI_HandleTypeDef hspi5;
+
+extern TIM_HandleTypeDef htim2;
+extern TIM_HandleTypeDef htim4;
+extern TIM_HandleTypeDef htim5;
+extern TIM_HandleTypeDef htim8;
+extern TIM_HandleTypeDef htim12;
 
 extern UART_HandleTypeDef huart1;
 extern UART_HandleTypeDef huart2;

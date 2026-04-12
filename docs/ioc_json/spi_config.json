@@ -1,0 +1,46 @@
+{
+  "metadata": {
+    "generated_at": "2026-02-12T16:07:58.509761",
+    "description": "SPI配置"
+  },
+  "instances": {
+    "SPI4": {
+      "name": "SPI4",
+      "mode": "SPI_MODE_MASTER",
+      "direction": "SPI_DIRECTION_2LINES",
+      "baud_rate": "42.0 MBits/s",
+      "clock_polarity": "Unknown",
+      "clock_phase": "Unknown",
+      "pins": {
+        "PE12": "SPI4_SCK",
+        "PE4": "SPI4_NSS",
+        "PE5": "SPI4_MISO",
+        "PE6": "SPI4_MOSI"
+      },
+      "parameters": {
+        "IPParameters": "VirtualType,Mode,Direction,CalculateBaudRate,VirtualNSS",
+        "VirtualNSS": "VM_NSSHARD",
+        "VirtualType": "VM_MASTER"
+      }
+    },
+    "SPI5": {
+      "name": "SPI5",
+      "mode": "SPI_MODE_MASTER",
+      "direction": "SPI_DIRECTION_2LINES",
+      "baud_rate": "328.125 KBits/s",
+      "clock_polarity": "SPI_POLARITY_HIGH",
+      "clock_phase": "SPI_PHASE_2EDGE",
+      "pins": {
+        "PF6": "SPI5_NSS",
+        "PF7": "SPI5_SCK",
+        "PF8": "SPI5_MISO",
+        "PF9": "SPI5_MOSI"
+      },
+      "parameters": {
+        "BaudRatePrescaler": "SPI_BAUDRATEPRESCALER_256",
+        "IPParameters": "VirtualType,Mode,Direction,CalculateBaudRate,BaudRatePrescaler,CLKPolarity,CLKPhase",
+        "VirtualType": "VM_MASTER"
+      }
+    }
+  }
+}

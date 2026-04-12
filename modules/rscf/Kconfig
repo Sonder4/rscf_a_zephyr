@@ -24,6 +24,10 @@ config RSCF_BUZZER
   bool "Enable RSCF buzzer driver"
   default y
 
+config RSCF_POWER_SWITCH
+  bool "Enable RSCF power switch driver"
+  default y
+
 config RSCF_COMM_SERVICE
   bool "Enable RSCF communication service"
   default y

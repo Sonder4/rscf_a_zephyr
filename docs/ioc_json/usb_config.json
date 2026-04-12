@@ -1,0 +1,18 @@
+{
+  "metadata": {
+    "generated_at": "2026-02-12T16:07:58.511272",
+    "description": "USB配置"
+  },
+  "enabled": true,
+  "class_type": "CDC",
+  "device_info": {
+    "manufacturer": "NCUEmbedded",
+    "product": "Virtual ComPort",
+    "pid": "2026"
+  },
+  "pins": {
+    "PA11": "USB_OTG_FS_DM",
+    "PA12": "USB_OTG_FS_DP",
+    "VP_USB_DEVICE_VS_USB_DEVICE_CDC_FS": "USB_DEVICE_VS_USB_DEVICE_CDC_FS"
+  }
+}

@@ -86,6 +86,13 @@ add_custom_target(rscf_mcu_comm_sync
   VERBATIM
 )
 
+add_custom_target(rscf_ioc_validate
+  COMMAND ${Python3_EXECUTABLE}
+          ${CMAKE_CURRENT_LIST_DIR}/../scripts/ioc/validate_board_from_ioc.py
+          --repo-root ${CMAKE_CURRENT_LIST_DIR}/..
+  VERBATIM
+)
+
 zephyr_include_directories(${ZEPHYR_BASE}/modules/cmsis_6)
 zephyr_include_directories(${RSCF_WEST_TOPDIR}/third_party/hal/cmsis/CMSIS/Core/Include)
 zephyr_compile_definitions(SHPR=SHP)
@@ -110,10 +117,14 @@ target_sources(app PRIVATE
   ../drivers/bsp/bsp_log.c
   ../drivers/bsp/bsp_dwt.c
   ../drivers/bsp/bsp_can.c
+  ../drivers/bsp/bsp_spi.c
+  ../drivers/bsp/bsp_pwm.c
+  ../drivers/bsp/bsp_tim.c
   ../drivers/rscf/rscf_boot.c
   ../drivers/rscf/rscf_led_status.c
   ../drivers/rscf/rscf_ext_uart_mux.c
   ../drivers/rscf/rscf_buzzer.c
+  ../drivers/rscf/rscf_power_switch.c
   ../modules/algorithm/coordinate_system.c
   ../modules/algorithm/crc8.c
   ../modules/algorithm/crc16.c
@@ -167,3 +178,4 @@ target_sources(app PRIVATE
 )
 
 add_dependencies(app rscf_mcu_comm_codegen)
+add_dependencies(app rscf_ioc_validate)

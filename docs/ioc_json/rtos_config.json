@@ -1,0 +1,21 @@
+{
+  "metadata": {
+    "generated_at": "2026-02-12T16:07:58.511272",
+    "description": "FreeRTOS配置"
+  },
+  "enabled": true,
+  "heap_size": 20000,
+  "tasks": [
+    {
+      "name": "defaultTask",
+      "definition": "defaultTask,24,3000,StartDefaultTask,As weak,NULL,Static,defaultTaskBuffer,defaultTaskControlBlock"
+    }
+  ],
+  "parameters": {
+    "FootprintOK": "true",
+    "INCLUDE_pcTaskGetTaskName": "1",
+    "IPParameters": "Tasks01,configENABLE_FPU,configTOTAL_HEAP_SIZE,INCLUDE_pcTaskGetTaskName,FootprintOK",
+    "configENABLE_FPU": "1",
+    "configTOTAL_HEAP_SIZE": "20000"
+  }
+}

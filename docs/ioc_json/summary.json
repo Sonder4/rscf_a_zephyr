@@ -1,0 +1,64 @@
+{
+  "metadata": {
+    "generated_at": "2026-02-12T16:07:58.505703",
+    "ioc_file": "RSCF_A.ioc",
+    "parser_version": "1.0.0"
+  },
+  "project_info": {
+    "project_name": "RSCF_A",
+    "toolchain": "CMake",
+    "firmware_package": "STM32Cube FW_F4 V1.28.3",
+    "cube_mx_version": "6.14.0",
+    "heap_size": "0x5000",
+    "stack_size": "0x5000"
+  },
+  "mcu_info": {
+    "name": "STM32F427I(G-I)Hx",
+    "user_name": "STM32F427IIHx",
+    "family": "STM32F4",
+    "package": "UFBGA176",
+    "cpn": "STM32F427IIH6",
+    "ip_count": "26",
+    "pin_count": "76"
+  },
+  "peripherals": {
+    "usart": [
+      "UART7",
+      "UART8",
+      "USART1",
+      "USART2",
+      "USART3",
+      "USART6"
+    ],
+    "can": [
+      "CAN1",
+      "CAN2"
+    ],
+    "spi": [
+      "SPI4",
+      "SPI5"
+    ],
+    "i2c": [
+      "I2C2"
+    ],
+    "tim": [
+      "TIM12",
+      "TIM2",
+      "TIM4",
+      "TIM5",
+      "TIM8"
+    ],
+    "adc": [],
+    "dac": [],
+    "usb": [
+      "USB_DEVICE",
+      "USB_OTG_FS"
+    ],
+    "other": []
+  },
+  "pin_count": {
+    "total_configured": 76,
+    "gpio_output": 14,
+    "gpio_input": 1
+  }
+}

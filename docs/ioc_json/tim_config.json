@@ -1,0 +1,98 @@
+{
+  "metadata": {
+    "generated_at": "2026-02-12T16:07:58.509761",
+    "description": "定时器配置"
+  },
+  "instances": {
+    "TIM12": {
+      "name": "TIM12",
+      "type": "Unknown",
+      "prescaler": 83,
+      "period": 369,
+      "channels": {
+        "Channel-PWM\\ Generation1\\ CH1": "TIM_CHANNEL_1"
+      },
+      "pins": {},
+      "parameters": {
+        "AutoReloadPreload": "TIM_AUTORELOAD_PRELOAD_ENABLE",
+        "IPParameters": "Channel-PWM Generation1 CH1,Period,Prescaler,AutoReloadPreload,Pulse-PWM Generation1 CH1",
+        "Pulse-PWM\\ Generation1\\ CH1": "185"
+      }
+    },
+    "TIM2": {
+      "name": "TIM2",
+      "type": "Unknown",
+      "prescaler": 167,
+      "period": 19999,
+      "channels": {
+        "Channel-PWM\\ Generation1\\ CH1": "TIM_CHANNEL_1",
+        "Channel-PWM\\ Generation2\\ CH2": "TIM_CHANNEL_2",
+        "Channel-PWM\\ Generation3\\ CH3": "TIM_CHANNEL_3",
+        "Channel-PWM\\ Generation4\\ CH4": "TIM_CHANNEL_4"
+      },
+      "pins": {},
+      "parameters": {
+        "IPParameters": "Channel-PWM Generation1 CH1,Channel-PWM Generation2 CH2,Channel-PWM Generation3 CH3,Channel-PWM Generation4 CH4,Prescaler,Period"
+      }
+    },
+    "TIM4": {
+      "name": "TIM4",
+      "type": "Unknown",
+      "prescaler": 167,
+      "period": 19999,
+      "channels": {
+        "Channel-PWM\\ Generation1\\ CH1": "TIM_CHANNEL_1",
+        "Channel-PWM\\ Generation2\\ CH2": "TIM_CHANNEL_2",
+        "Channel-PWM\\ Generation3\\ CH3": "TIM_CHANNEL_3",
+        "Channel-PWM\\ Generation4\\ CH4": "TIM_CHANNEL_4"
+      },
+      "pins": {},
+      "parameters": {
+        "IPParameters": "Channel-PWM Generation1 CH1,Channel-PWM Generation3 CH3,Channel-PWM Generation4 CH4,Period,Prescaler,Pulse-PWM Generation1 CH1,Pulse-PWM Generation3 CH3,Pulse-PWM Generation4 CH4,Channel-PWM Generation2 CH2",
+        "Pulse-PWM\\ Generation1\\ CH1": "2000",
+        "Pulse-PWM\\ Generation3\\ CH3": "2000",
+        "Pulse-PWM\\ Generation4\\ CH4": "2000"
+      }
+    },
+    "TIM5": {
+      "name": "TIM5",
+      "type": "Unknown",
+      "prescaler": 167,
+      "period": 19999,
+      "channels": {
+        "Channel-PWM\\ Generation1\\ CH1": "TIM_CHANNEL_1",
+        "Channel-PWM\\ Generation2\\ CH2": "TIM_CHANNEL_2",
+        "Channel-PWM\\ Generation3\\ CH3": "TIM_CHANNEL_3",
+        "Channel-PWM\\ Generation4\\ CH4": "TIM_CHANNEL_4"
+      },
+      "pins": {},
+      "parameters": {
+        "IPParameters": "Channel-PWM Generation1 CH1,Channel-PWM Generation2 CH2,Channel-PWM Generation3 CH3,Channel-PWM Generation4 CH4,Period,Prescaler,Pulse-PWM Generation1 CH1,Pulse-PWM Generation2 CH2,Pulse-PWM Generation3 CH3,Pulse-PWM Generation4 CH4",
+        "Pulse-PWM\\ Generation1\\ CH1": "2000",
+        "Pulse-PWM\\ Generation2\\ CH2": "2000",
+        "Pulse-PWM\\ Generation3\\ CH3": "2000",
+        "Pulse-PWM\\ Generation4\\ CH4": "2000"
+      }
+    },
+    "TIM8": {
+      "name": "TIM8",
+      "type": "Unknown",
+      "prescaler": 167,
+      "period": 19999,
+      "channels": {
+        "Channel-PWM\\ Generation1\\ CH1": "TIM_CHANNEL_1",
+        "Channel-PWM\\ Generation2\\ CH2": "TIM_CHANNEL_2",
+        "Channel-PWM\\ Generation3\\ CH3": "TIM_CHANNEL_3",
+        "Channel-PWM\\ Generation4\\ CH4": "TIM_CHANNEL_4"
+      },
+      "pins": {},
+      "parameters": {
+        "IPParameters": "Channel-PWM Generation1 CH1,Channel-PWM Generation2 CH2,Channel-PWM Generation3 CH3,Channel-PWM Generation4 CH4,Prescaler,Period,Pulse-PWM Generation1 CH1,Pulse-PWM Generation2 CH2,Pulse-PWM Generation3 CH3,Pulse-PWM Generation4 CH4",
+        "Pulse-PWM\\ Generation1\\ CH1": "2000",
+        "Pulse-PWM\\ Generation2\\ CH2": "2000",
+        "Pulse-PWM\\ Generation3\\ CH3": "2000",
+        "Pulse-PWM\\ Generation4\\ CH4": "2000"
+      }
+    }
+  }
+}

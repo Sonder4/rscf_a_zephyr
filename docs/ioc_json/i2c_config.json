@@ -1,0 +1,20 @@
+{
+  "metadata": {
+    "generated_at": "2026-02-12T16:07:58.511272",
+    "description": "I2C配置"
+  },
+  "instances": {
+    "I2C2": {
+      "name": "I2C2",
+      "mode": "I2C_Fast",
+      "pins": {
+        "PF0": "I2C2_SDA",
+        "PF1": "I2C2_SCL"
+      },
+      "dma": {},
+      "parameters": {
+        "IPParameters": "I2C_Mode"
+      }
+    }
+  }
+}

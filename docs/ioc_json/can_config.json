@@ -1,0 +1,52 @@
+{
+  "metadata": {
+    "generated_at": "2026-02-12T16:07:58.509251",
+    "description": "CAN控制器配置"
+  },
+  "instances": {
+    "CAN1": {
+      "name": "CAN1",
+      "baud_rate": 1000000,
+      "time_quantum_ns": 71.42857142857143,
+      "bit_time_ns": 1000,
+      "prescaler": 3,
+      "bs1": "CAN_BS1_10TQ",
+      "bs2": "CAN_BS2_3TQ",
+      "pins": {
+        "PD0": "CAN1_RX",
+        "PD1": "CAN1_TX"
+      },
+      "interrupts": [
+        "CAN1_RX0_IRQn",
+        "CAN1_RX1_IRQn"
+      ],
+      "parameters": {
+        "IPParameters": "CalculateTimeQuantum,CalculateTimeBit,CalculateBaudRate,BS1,Prescaler,BS2,NART,TXFP",
+        "NART": "ENABLE",
+        "TXFP": "ENABLE"
+      }
+    },
+    "CAN2": {
+      "name": "CAN2",
+      "baud_rate": 1000000,
+      "time_quantum_ns": 71.42857142857143,
+      "bit_time_ns": 1000,
+      "prescaler": 3,
+      "bs1": "CAN_BS1_10TQ",
+      "bs2": "CAN_BS2_3TQ",
+      "pins": {
+        "PB12": "CAN2_RX",
+        "PB13": "CAN2_TX"
+      },
+      "interrupts": [
+        "CAN2_RX0_IRQn",
+        "CAN2_RX1_IRQn"
+      ],
+      "parameters": {
+        "IPParameters": "CalculateTimeQuantum,CalculateTimeBit,CalculateBaudRate,BS1,Prescaler,BS2,NART,TXFP",
+        "NART": "ENABLE",
+        "TXFP": "ENABLE"
+      }
+    }
+  }
+}

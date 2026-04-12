@@ -1,0 +1,13 @@
+description: RSCF controllable power switch bank
+
+compatible: "ncurc,rscf-power-switch-bank"
+
+include: base.yaml
+
+properties:
+  power-gpios:
+    type: phandle-array
+    required: true
+  default-state-mask:
+    type: int
+    default: 0

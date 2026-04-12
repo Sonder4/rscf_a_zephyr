@@ -1,0 +1,175 @@
+{
+  "metadata": {
+    "generated_at": "2026-02-12T16:07:58.506720",
+    "description": "USART/UART串口配置汇总"
+  },
+  "instances": {
+    "UART7": {
+      "name": "UART7",
+      "mode": "Asynchronous",
+      "pins": {
+        "PE7": "UART7_RX",
+        "PE8": "UART7_TX"
+      },
+      "dma": {
+        "rx": {
+          "Direction": "DMA_PERIPH_TO_MEMORY",
+          "FIFOMode": "DMA_FIFOMODE_DISABLE",
+          "Instance": "DMA1_Stream3",
+          "MemDataAlignment": "DMA_MDATAALIGN_BYTE",
+          "MemInc": "DMA_MINC_ENABLE",
+          "Mode": "DMA_NORMAL",
+          "PeriphDataAlignment": "DMA_PDATAALIGN_BYTE",
+          "PeriphInc": "DMA_PINC_DISABLE",
+          "Priority": "DMA_PRIORITY_LOW",
+          "RequestParameters": "Instance,Direction,PeriphInc,MemInc,PeriphDataAlignment,MemDataAlignment,Mode,Priority,FIFOMode"
+        },
+        "tx": {
+          "Direction": "DMA_MEMORY_TO_PERIPH",
+          "FIFOMode": "DMA_FIFOMODE_DISABLE",
+          "Instance": "DMA1_Stream1",
+          "MemDataAlignment": "DMA_MDATAALIGN_BYTE",
+          "MemInc": "DMA_MINC_ENABLE",
+          "Mode": "DMA_NORMAL",
+          "PeriphDataAlignment": "DMA_PDATAALIGN_BYTE",
+          "PeriphInc": "DMA_PINC_DISABLE",
+          "Priority": "DMA_PRIORITY_LOW",
+          "RequestParameters": "Instance,Direction,PeriphInc,MemInc,PeriphDataAlignment,MemDataAlignment,Mode,Priority,FIFOMode"
+        }
+      },
+      "interrupt": true,
+      "parameters": {
+        "IPParameters": "VirtualMode"
+      }
+    },
+    "UART8": {
+      "name": "UART8",
+      "mode": "Asynchronous",
+      "pins": {
+        "PE0": "UART8_RX",
+        "PE1": "UART8_TX"
+      },
+      "dma": {
+        "tx": {
+          "Direction": "DMA_MEMORY_TO_PERIPH",
+          "FIFOMode": "DMA_FIFOMODE_DISABLE",
+          "Instance": "DMA1_Stream0",
+          "MemDataAlignment": "DMA_MDATAALIGN_BYTE",
+          "MemInc": "DMA_MINC_ENABLE",
+          "Mode": "DMA_NORMAL",
+          "PeriphDataAlignment": "DMA_PDATAALIGN_BYTE",
+          "PeriphInc": "DMA_PINC_DISABLE",
+          "Priority": "DMA_PRIORITY_LOW",
+          "RequestParameters": "Instance,Direction,PeriphInc,MemInc,PeriphDataAlignment,MemDataAlignment,Mode,Priority,FIFOMode"
+        }
+      },
+      "interrupt": true,
+      "parameters": {
+        "IPParameters": "VirtualMode"
+      }
+    },
+    "USART1": {
+      "name": "USART1",
+      "mode": "Asynchronous",
+      "pins": {
+        "PB6": "USART1_TX",
+        "PB7": "USART1_RX"
+      },
+      "dma": {},
+      "interrupt": true,
+      "parameters": {
+        "IPParameters": "VirtualMode"
+      }
+    },
+    "USART2": {
+      "name": "USART2",
+      "mode": "Asynchronous",
+      "pins": {
+        "PD5": "USART2_TX",
+        "PD6": "USART2_RX"
+      },
+      "dma": {
+        "rx": {
+          "Direction": "DMA_PERIPH_TO_MEMORY",
+          "FIFOMode": "DMA_FIFOMODE_DISABLE",
+          "Instance": "DMA1_Stream5",
+          "MemDataAlignment": "DMA_MDATAALIGN_BYTE",
+          "MemInc": "DMA_MINC_ENABLE",
+          "Mode": "DMA_NORMAL",
+          "PeriphDataAlignment": "DMA_PDATAALIGN_BYTE",
+          "PeriphInc": "DMA_PINC_DISABLE",
+          "Priority": "DMA_PRIORITY_LOW",
+          "RequestParameters": "Instance,Direction,PeriphInc,MemInc,PeriphDataAlignment,MemDataAlignment,Mode,Priority,FIFOMode"
+        },
+        "tx": {
+          "Direction": "DMA_MEMORY_TO_PERIPH",
+          "FIFOMode": "DMA_FIFOMODE_DISABLE",
+          "Instance": "DMA1_Stream6",
+          "MemDataAlignment": "DMA_MDATAALIGN_BYTE",
+          "MemInc": "DMA_MINC_ENABLE",
+          "Mode": "DMA_NORMAL",
+          "PeriphDataAlignment": "DMA_PDATAALIGN_BYTE",
+          "PeriphInc": "DMA_PINC_DISABLE",
+          "Priority": "DMA_PRIORITY_LOW",
+          "RequestParameters": "Instance,Direction,PeriphInc,MemInc,PeriphDataAlignment,MemDataAlignment,Mode,Priority,FIFOMode"
+        }
+      },
+      "interrupt": true,
+      "parameters": {
+        "IPParameters": "VirtualMode"
+      }
+    },
+    "USART3": {
+      "name": "USART3",
+      "mode": "Asynchronous",
+      "pins": {
+        "PD8": "USART3_TX",
+        "PD9": "USART3_RX"
+      },
+      "dma": {
+        "tx": {
+          "Direction": "DMA_MEMORY_TO_PERIPH",
+          "FIFOMode": "DMA_FIFOMODE_DISABLE",
+          "Instance": "DMA1_Stream4",
+          "MemDataAlignment": "DMA_MDATAALIGN_BYTE",
+          "MemInc": "DMA_MINC_ENABLE",
+          "Mode": "DMA_NORMAL",
+          "PeriphDataAlignment": "DMA_PDATAALIGN_BYTE",
+          "PeriphInc": "DMA_PINC_DISABLE",
+          "Priority": "DMA_PRIORITY_LOW",
+          "RequestParameters": "Instance,Direction,PeriphInc,MemInc,PeriphDataAlignment,MemDataAlignment,Mode,Priority,FIFOMode"
+        }
+      },
+      "interrupt": true,
+      "parameters": {
+        "IPParameters": "VirtualMode"
+      }
+    },
+    "USART6": {
+      "name": "USART6",
+      "mode": "Asynchronous",
+      "pins": {
+        "PG14": "USART6_TX",
+        "PG9": "USART6_RX"
+      },
+      "dma": {
+        "rx": {
+          "Direction": "DMA_PERIPH_TO_MEMORY",
+          "FIFOMode": "DMA_FIFOMODE_DISABLE",
+          "Instance": "DMA2_Stream2",
+          "MemDataAlignment": "DMA_MDATAALIGN_BYTE",
+          "MemInc": "DMA_MINC_ENABLE",
+          "Mode": "DMA_NORMAL",
+          "PeriphDataAlignment": "DMA_PDATAALIGN_BYTE",
+          "PeriphInc": "DMA_PINC_DISABLE",
+          "Priority": "DMA_PRIORITY_LOW",
+          "RequestParameters": "Instance,Direction,PeriphInc,MemInc,PeriphDataAlignment,MemDataAlignment,Mode,Priority,FIFOMode"
+        }
+      },
+      "interrupt": true,
+      "parameters": {
+        "IPParameters": "VirtualMode"
+      }
+    }
+  }
+}
