@@ -59,3 +59,19 @@ def test_codegen_context_exposes_vnext_metadata():
     assert "vnext_link_roles" in context
     assert "vnext_compat_endpoints" in context
     assert context["vnext_compat_endpoints"]["by_mid"]["0x05"] == "mcu_one"
+
+
+def test_base_generator_loads_vnext_metadata_without_breaking_contract():
+    module = _load_codegen_module()
+    generator = module.load_generator_class()(str(module.PROTOCOL_JSON), str(REPO_ROOT))
+
+    assert generator.load_protocol()
+    assert generator.protocol_data["endpoint_schema"]["meta"]["schema"] == "rscf-link-vnext-endpoint"
+    assert generator.protocol_data["link_roles"]["meta"]["schema"] == "rscf-link-vnext-roles"
+    assert generator.protocol_data["compat_endpoints"]["by_device"]["MCU_ONE"] == "mcu_one"
+
+    vnext_context = generator._build_vnext_context()
+
+    assert vnext_context["vnext"]["endpoints"]["schema"] == "endpoint_schema.yaml"
+    assert vnext_context["vnext_endpoints"]["compat"]["by_mid"]["0x05"] == "mcu_one"
+    assert vnext_context["vnext_links"]["roles"] == "link_roles.yaml"
