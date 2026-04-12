@@ -35,11 +35,13 @@ def test_manifest_pins_zephyr_43() -> None:
 
 def test_app_has_minimal_entrypoint() -> None:
     app_cmake = (REPO_ROOT / "app" / "CMakeLists.txt").read_text(encoding="utf-8")
+    app_kconfig = (REPO_ROOT / "app" / "Kconfig").read_text(encoding="utf-8")
     prj_conf = (REPO_ROOT / "app" / "prj.conf").read_text(encoding="utf-8")
     main_c = (REPO_ROOT / "app" / "src" / "main.c").read_text(encoding="utf-8")
 
     assert "find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})" in app_cmake
     assert "project(rscf_a_zephyr)" in app_cmake
+    assert 'rsource "../modules/rscf/Kconfig"' in app_kconfig
     assert "CONFIG_GPIO=y" in prj_conf
     assert "CONFIG_SERIAL=y" in prj_conf
     assert "int main(void)" in main_c

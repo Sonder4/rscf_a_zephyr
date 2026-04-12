@@ -32,9 +32,37 @@ config RSCF_COMM_SERVICE
   bool "Enable RSCF communication service"
   default y
 
+config RSCF_LINK_VNEXT
+  bool "Enable RSCF Link vNext runtime"
+  default y
+
+config RSCF_LINK_HOST_USB
+  bool "Use USB CDC ACM as host link"
+  default y
+  depends on RSCF_LINK_VNEXT
+
+config RSCF_LINK_PEER_UART
+  bool "Use UART as peer link"
+  default y
+  depends on RSCF_LINK_VNEXT
+
+config RSCF_LINK_COMPAT_SYSTEM_CMD
+  bool "Enable SYSTEM_CMD/SYSTEM_STATUS compatibility"
+  default y
+  depends on RSCF_LINK_VNEXT
+
+choice RSCF_ROS_BACKEND
+  prompt "RSCF ROS backend"
+  default RSCF_ROS_BACKEND_BRIDGE
+  depends on RSCF_LINK_VNEXT
+
+config RSCF_ROS_BACKEND_BRIDGE
+  bool "Use bridge backend (MCU comm)"
+
 config RSCF_ROS_BACKEND_MICROROS
   bool "Use micro-ROS as ROS backend"
-  default n
+
+endchoice
 
 config RSCF_MICROROS_SERVICE
   bool "Enable RSCF micro-ROS service"
