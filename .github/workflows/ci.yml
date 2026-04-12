@@ -1,0 +1,107 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Run unit tests
+        run: python -m pytest tests/unit -q
+
+  firmware-build:
+    runs-on: ubuntu-22.04
+    env:
+      ZEPHYR_TOOLCHAIN_VARIANT: gnuarmemb
+      GNUARMEMB_TOOLCHAIN_PATH: /usr
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            ccache \
+            curl \
+            device-tree-compiler \
+            gcc-arm-none-eabi \
+            git \
+            gperf \
+            libmagic1 \
+            ninja-build \
+            unzip
+
+      - name: Install host build tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --user colcon-common-extensions vcstool
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Bootstrap workspace
+        run: ./scripts/bootstrap/bootstrap.sh
+
+      - name: Build firmware
+        run: |
+          source .venv/bin/activate
+          cd .workspace
+          west build -b rscf_a_f427iih6 ../app -d build_microros
+        shell: bash
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rscf-a-zephyr-firmware
+          path: |
+            .workspace/build_microros/zephyr/zephyr.elf
+            .workspace/build_microros/zephyr/zephyr.hex
+            .workspace/build_microros/zephyr/zephyr.bin
+            .workspace/build_microros/zephyr/zephyr.map
+
+  ros2-workspace-build:
+    runs-on: ubuntu-22.04
+    container:
+      image: ros:humble-ros-base-jammy
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ROS 2 workspace dependencies
+        run: |
+          apt-get update
+          apt-get install -y python3-colcon-common-extensions
+
+      - name: Build host ROS 2 workspace
+        run: |
+          source /opt/ros/humble/setup.bash
+          cd ros2_ws
+          colcon build
+        shell: bash

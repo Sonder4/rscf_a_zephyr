@@ -44,6 +44,18 @@ source install/setup.bash
 ros2 launch rscf_a_host rscf_host_io.launch.py start_agent:=true serial_device:=/dev/ttyACM0
 ```
 
+## CI
+
+GitHub Actions runs three GitHub-hosted checks on every `push` to `main` and on
+every `pull_request`:
+
+- `pytest tests/unit -q`
+- `west build -b rscf_a_f427iih6 ../app -d build_microros`
+- `cd ros2_ws && colcon build`
+
+The firmware job uploads `zephyr.elf`, `zephyr.hex`, `zephyr.bin`, and
+`zephyr.map` as workflow artifacts.
+
 ## Current Status
 
 This repository currently provides:
