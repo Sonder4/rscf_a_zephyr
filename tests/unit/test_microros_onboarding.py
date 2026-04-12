@@ -22,7 +22,7 @@ def test_microros_module_and_service_scaffold_exist() -> None:
         assert (REPO_ROOT / relpath).is_file(), relpath
 
 
-def test_app_cmake_and_prj_conf_enable_microros_path() -> None:
+def test_app_cmake_and_prj_conf_keep_microros_path_available() -> None:
     app_cmake = (REPO_ROOT / "app" / "CMakeLists.txt").read_text(encoding="utf-8")
     microros_module_cmake = (REPO_ROOT / "modules" / "lib" / "libmicroros" / "CMakeLists.txt").read_text(
         encoding="utf-8"
@@ -35,10 +35,11 @@ def test_app_cmake_and_prj_conf_enable_microros_path() -> None:
     assert "get_package_names" not in microros_module_cmake
     assert "execute_process(" not in microros_module_cmake
 
-    assert "CONFIG_RSCF_ROS_BACKEND_MICROROS=y" in prj_conf
-    assert "CONFIG_RSCF_MICROROS_SERVICE=y" in prj_conf
-    assert "CONFIG_RSCF_MICROROS_SIM_MODE=y" in prj_conf
-    assert "CONFIG_RSCF_COMM_SERVICE=n" in prj_conf
+    assert "CONFIG_RSCF_ROS_BACKEND_BRIDGE=y" in prj_conf
+    assert "CONFIG_RSCF_ROS_BACKEND_MICROROS=n" in prj_conf
+    assert "CONFIG_RSCF_MICROROS_SERVICE=y" not in prj_conf
+    assert "CONFIG_RSCF_MICROROS_SIM_MODE=y" not in prj_conf
+    assert "CONFIG_RSCF_COMM_SERVICE=y" in prj_conf
 
 
 def test_bootstrap_installs_microros_host_tools_into_repo_venv() -> None:
