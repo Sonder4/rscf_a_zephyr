@@ -54,10 +54,16 @@ def test_link_runtime_skeleton_is_added_to_build():
     assert "struct ring_buf" in link_service_h
     assert "struct k_work_delayable" in link_service_h
     assert "struct k_msgq" in link_service_h
+    assert "RSCF_LINK_SERVICE_POLL_PERIOD_MS" in link_service_h
     assert "RSCFLinkServiceInit" in link_service_c
     assert "RSCFLinkServiceProcess" in link_service_c
     assert "RSCFLinkServiceGetRuntime" in link_service_c
+    assert "SYS_INIT(rscf_link_service_auto_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);" in link_service_c
+    assert "k_msgq_put(&s_runtime.event_queue, &event, K_NO_WAIT) == 0" in link_service_c
+    assert "s_runtime.dropped_events++;" in link_service_c
+    assert "k_work_reschedule(&s_runtime.poll_work, K_MSEC(RSCF_LINK_SERVICE_POLL_PERIOD_MS))" in link_service_c
     assert "RSCFServiceRouterInit" in service_router_c
     assert "RSCFServiceRouterDispatch" in service_router_c
     assert "RSCFActionServiceInit" in action_service_c
     assert "RSCFActionServiceProcess" in action_service_c
+    assert "runtime->handled_events >= runtime->last_event_sequence" in action_service_c

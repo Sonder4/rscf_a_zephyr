@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include <zephyr/init.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
 
@@ -23,8 +24,15 @@ static void rscf_link_service_poll_handler(struct k_work *work)
     return;
   }
 
-  s_runtime.scheduled_events = event.sequence;
-  (void)k_msgq_put(&s_runtime.event_queue, &event, K_NO_WAIT);
+  if (k_msgq_put(&s_runtime.event_queue, &event, K_NO_WAIT) == 0) {
+    s_runtime.scheduled_events = event.sequence;
+  } else {
+    s_runtime.dropped_events++;
+  }
+
+  (void)RSCFServiceRouterDispatch(&s_runtime);
+  RSCFActionServiceProcess(&s_runtime);
+  (void)k_work_reschedule(&s_runtime.poll_work, K_MSEC(RSCF_LINK_SERVICE_POLL_PERIOD_MS));
 }
 
 static void rscf_link_service_runtime_init(struct rscf_link_runtime *runtime)
@@ -61,6 +69,7 @@ int RSCFLinkServiceInit(void)
     return ret;
   }
 
+  (void)k_work_reschedule(&s_runtime.poll_work, K_MSEC(RSCF_LINK_SERVICE_POLL_PERIOD_MS));
   LOG_INF("link runtime skeleton initialized");
   return 0;
 }
@@ -80,3 +89,10 @@ struct rscf_link_runtime *RSCFLinkServiceGetRuntime(void)
 {
   return s_runtime.ready ? &s_runtime : NULL;
 }
+
+static int rscf_link_service_auto_init(void)
+{
+  return RSCFLinkServiceInit();
+}
+
+SYS_INIT(rscf_link_service_auto_init, APPLICATION, CONFIG_APPLICATION_INIT_PRIORITY);

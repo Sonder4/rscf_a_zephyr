@@ -15,5 +15,9 @@ void RSCFActionServiceProcess(struct rscf_link_runtime *runtime)
     return;
   }
 
+  if (runtime->handled_events >= runtime->last_event_sequence) {
+    return;
+  }
+
   runtime->handled_events++;
 }

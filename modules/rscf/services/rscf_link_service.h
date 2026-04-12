@@ -9,6 +9,7 @@
 
 #define RSCF_LINK_SERVICE_RING_BUFFER_SIZE 256U
 #define RSCF_LINK_SERVICE_MSGQ_DEPTH 4U
+#define RSCF_LINK_SERVICE_POLL_PERIOD_MS 1U
 
 enum rscf_link_runtime_event_type {
   RSCF_LINK_RUNTIME_EVENT_NONE = 0,
@@ -30,6 +31,7 @@ struct rscf_link_runtime {
   struct rscf_link_runtime_event event_storage[RSCF_LINK_SERVICE_MSGQ_DEPTH];
   uint32_t scheduled_events;
   uint32_t handled_events;
+  uint32_t dropped_events;
   uint32_t last_event_sequence;
   uint8_t last_event_type;
   bool ready;
