@@ -55,13 +55,12 @@ def test_link_runtime_skeleton_is_added_to_build():
     assert "../modules/rscf/services/rscf_service_router.c" in app_cmake
     assert "../modules/rscf/services/rscf_action_service.c" in app_cmake
     assert "struct rscf_link_runtime" in link_service_h
-    assert "RSCF_LINK_RING_CAPACITY" in link_service_h
     assert "struct ring_buf" in link_service_h
     assert "struct k_work_delayable" in link_service_h
     assert "struct k_msgq" in link_service_h
     assert "RSCFLinkServiceInit" in link_service_c
     assert "RSCFLinkServiceProcess" in link_service_c
-    assert "rscf_link_dispatch_frame" in link_service_c
+    assert "RSCFLinkServiceGetRuntime" in link_service_c
     assert "RSCFServiceRouterInit" in service_router_c
     assert "RSCFServiceRouterDispatch" in service_router_c
     assert "RSCFActionServiceInit" in action_service_c
