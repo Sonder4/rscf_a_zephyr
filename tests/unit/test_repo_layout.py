@@ -65,3 +65,10 @@ def test_segger_module_is_vendored_in_repo_root() -> None:
     assert "../modules/debug/segger" in app_cmake
     assert ".workspace/modules/debug/segger" not in app_cmake
     assert "name: segger" not in west_yml
+
+
+def test_link_vnext_runtime_skeleton_files_exist() -> None:
+    assert (REPO_ROOT / "modules" / "rscf" / "services" / "rscf_link_service.c").is_file()
+    assert (REPO_ROOT / "modules" / "rscf" / "services" / "rscf_link_service.h").is_file()
+    assert (REPO_ROOT / "modules" / "rscf" / "services" / "rscf_service_router.c").is_file()
+    assert (REPO_ROOT / "modules" / "rscf" / "services" / "rscf_action_service.c").is_file()

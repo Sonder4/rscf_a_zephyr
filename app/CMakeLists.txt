@@ -162,6 +162,9 @@ target_sources(app PRIVATE
   ../modules/motor/servo_motor.c
   ../modules/rscf/core/rscf_app_profile.c
   ../modules/rscf/services/rscf_event_bus.c
+  ../modules/rscf/services/rscf_link_service.c
+  ../modules/rscf/services/rscf_service_router.c
+  ../modules/rscf/services/rscf_action_service.c
   ../modules/rscf/services/rscf_daemon_service.c
   ../modules/rscf/services/rscf_health_service.c
   ../modules/rscf/services/rscf_comm_service.c
