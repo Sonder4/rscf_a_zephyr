@@ -21,12 +21,6 @@ static struct rscf_event_bus_subscriber *s_subscribers[RSCF_EVENT_BUS_MAX_SUBSCR
 static struct k_spinlock s_event_bus_lock;
 static bool s_initialized;
 
-static void rscf_event_bus_reset_locked(void)
-{
-  memset(s_topics, 0, sizeof(s_topics));
-  memset(s_subscribers, 0, sizeof(s_subscribers));
-}
-
 static int rscf_event_bus_find_topic(const char *topic_name)
 {
   for (size_t i = 0; i < ARRAY_SIZE(s_topics); ++i) {
@@ -74,12 +68,12 @@ int RSCFEventBusInit(void)
 {
   k_spinlock_key_t key = k_spin_lock(&s_event_bus_lock);
 
-  s_initialized = false;
-  rscf_event_bus_reset_locked();
+  memset(s_topics, 0, sizeof(s_topics));
+  memset(s_subscribers, 0, sizeof(s_subscribers));
   s_initialized = true;
   k_spin_unlock(&s_event_bus_lock, key);
 
-  LOG_INF("event bus initialized");
+  LOG_INF("event bus initialized as local service bus");
   return 0;
 }
 

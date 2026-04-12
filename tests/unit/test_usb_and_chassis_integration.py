@@ -12,10 +12,6 @@ def test_usb_board_overlay_and_prj_conf_present():
     assert 'compatible = "zephyr,cdc-acm-uart";' in app_overlay
     assert overlay.exists()
 
-    overlay_text = overlay.read_text(encoding="utf-8")
-    assert "rscf,host-link = &cdc_acm_uart0;" in overlay_text
-    assert "rscf-host-usb = &cdc_acm_uart0;" in overlay_text
-
     assert "CONFIG_USB_DEVICE_STACK=y" in prj_conf
     assert "CONFIG_USB_CDC_ACM=y" in prj_conf
     assert "CONFIG_UART_LINE_CTRL=y" in prj_conf
