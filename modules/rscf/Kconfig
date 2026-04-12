@@ -57,10 +57,10 @@ choice RSCF_ROS_BACKEND
   depends on RSCF_LINK_VNEXT
 
 config RSCF_ROS_BACKEND_BRIDGE
-  bool "Use bridge backend (MCU comm)"
+  bool "Use host ROS2 bridge backend (default)"
 
 config RSCF_ROS_BACKEND_MICROROS
-  bool "Use micro-ROS as ROS backend"
+  bool "Use micro-ROS compatibility backend"
 
 endchoice
 

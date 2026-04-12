@@ -16,6 +16,10 @@ def test_ros2_workspace_and_host_package_exist() -> None:
         "ros2_ws/src/rscf_a_host/rscf_a_host/command_profile_node.py",
         "ros2_ws/src/rscf_a_host/rscf_a_host/status.py",
         "ros2_ws/src/rscf_a_host/config/command_profile.yaml",
+        "ros2_ws/src/rscf_link_bridge/package.xml",
+        "ros2_ws/src/rscf_link_bridge/CMakeLists.txt",
+        "ros2_ws/src/rscf_link_bridge/src/rscf_link_bridge_node.cpp",
+        "ros2_ws/src/rscf_link_bridge/launch/rscf_link_bridge.launch.py",
     ]
 
     for relpath in expected:
@@ -47,3 +51,26 @@ def test_ros2_host_package_exports_expected_interfaces() -> None:
     assert "decode_status_word" in status_py
     assert "service_ready" in status_py
     assert "link_connected" in status_py
+
+
+def test_ros2_link_bridge_package_exports_cpp_bridge_skeleton() -> None:
+    package_xml = (REPO_ROOT / "ros2_ws/src/rscf_link_bridge/package.xml").read_text(encoding="utf-8")
+    cmake_lists = (REPO_ROOT / "ros2_ws/src/rscf_link_bridge/CMakeLists.txt").read_text(encoding="utf-8")
+    launch_py = (
+        REPO_ROOT / "ros2_ws/src/rscf_link_bridge/launch/rscf_link_bridge.launch.py"
+    ).read_text(encoding="utf-8")
+    node_cpp = (
+        REPO_ROOT / "ros2_ws/src/rscf_link_bridge/src/rscf_link_bridge_node.cpp"
+    ).read_text(encoding="utf-8")
+
+    assert "<build_type>ament_cmake</build_type>" in package_xml
+    assert "<depend>rclcpp</depend>" in package_xml
+    assert "add_executable(rscf_link_bridge_node" in cmake_lists
+    assert "rscf_link_bridge" in launch_py
+    assert 'DeclareLaunchArgument("device_path"' in launch_py
+    assert 'DeclareLaunchArgument("compat_mode"' in launch_py
+    assert '"/cmd_vel"' in node_cpp
+    assert '"/odom"' in node_cpp
+    assert '"/imu/data"' in node_cpp
+    assert '"/rscf/system_status"' in node_cpp
+    assert '"/dev/serial/by-id/' in node_cpp
