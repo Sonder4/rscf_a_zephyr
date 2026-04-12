@@ -49,7 +49,7 @@ class ZephyrProtocolGenerator(load_generator_class()):
             else:
                 default_transport_macro = "MCU_COMM_TRANSPORT_USB"
 
-            return {
+            context = {
                 "mcu_device": mcu_device,
                 "mcu_name": mcu_device["name"],
                 "mcu_mid": mcu_device["mid"],
@@ -66,6 +66,8 @@ class ZephyrProtocolGenerator(load_generator_class()):
                 "endianness": self.protocol_data["endianness"],
                 "default_transport_macro": default_transport_macro,
             }
+            context.update(self._build_vnext_context())
+            return context
 
         raise ValueError(f"unknown MCU device: {device_name}")
 

@@ -146,6 +146,9 @@ class ProtocolGenerator:
 
             if not self._prepare_control_plane_bindings():
                 return False
+
+            if not self._prepare_vnext_metadata():
+                return False
             
             # 计算每个数据包的大小
             self._calculate_packet_sizes()
@@ -714,6 +717,49 @@ class ProtocolGenerator:
         }
         return True
 
+    def _prepare_vnext_metadata(self) -> bool:
+        endpoints = copy.deepcopy(self.protocol_data.get('endpoints', {}) or {})
+        links = copy.deepcopy(self.protocol_data.get('links', {}) or {})
+
+        endpoint_schema: Dict[str, Any] = {}
+        link_roles: Dict[str, Any] = {}
+
+        if endpoints.get('schema'):
+            schema_path = self.protocol_file.parent / str(endpoints['schema'])
+            endpoint_schema = self._load_yaml_file(schema_path, 'endpoint_schema ')
+            if endpoint_schema is None:
+                return False
+
+        if links.get('roles'):
+            roles_path = self.protocol_file.parent / str(links['roles'])
+            link_roles = self._load_yaml_file(roles_path, 'link_roles ')
+            if link_roles is None:
+                return False
+
+        compat_endpoints = copy.deepcopy(endpoints.get('compat', {}))
+
+        self.protocol_data['endpoint_schema'] = endpoint_schema
+        self.protocol_data['link_roles'] = link_roles
+        self.protocol_data['compat_endpoints'] = compat_endpoints
+        self.protocol_data['vnext'] = {
+            'endpoints': endpoints,
+            'links': links,
+            'endpoint_schema': endpoint_schema,
+            'link_roles': link_roles,
+            'compat_endpoints': compat_endpoints,
+        }
+        return True
+
+    def _build_vnext_context(self) -> Dict[str, Any]:
+        return {
+            'vnext': copy.deepcopy(self.protocol_data.get('vnext', {})),
+            'vnext_endpoints': copy.deepcopy(self.protocol_data.get('endpoints', {})),
+            'vnext_links': copy.deepcopy(self.protocol_data.get('links', {})),
+            'vnext_endpoint_schema': copy.deepcopy(self.protocol_data.get('endpoint_schema', {})),
+            'vnext_link_roles': copy.deepcopy(self.protocol_data.get('link_roles', {})),
+            'vnext_compat_endpoints': copy.deepcopy(self.protocol_data.get('compat_endpoints', {})),
+        }
+
     def get_system_status_packet(self, packets: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """获取SYSTEM_STATUS数据包定义。"""
         for packet in packets:
@@ -829,6 +875,7 @@ class ProtocolGenerator:
                 'type_mapping': self.protocol_data['type_mapping'],
                 'endianness': self.protocol_data['endianness']
             }
+            mcu_context.update(self._build_vnext_context())
             
             # 生成APP层代码
             self._render_template_with_context(
@@ -1052,6 +1099,7 @@ class ProtocolGenerator:
             'type_mapping': self.protocol_data['type_mapping'],
             'endianness': self.protocol_data['endianness']
         }
+        context.update(self._build_vnext_context())
 
         templates_to_generate = [
             ("ros2/protocol_parser_hpp.j2", include_dir / "protocol" / "protocol_parser.hpp"),

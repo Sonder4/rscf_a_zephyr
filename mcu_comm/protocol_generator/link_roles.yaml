@@ -1,0 +1,11 @@
+meta:
+  schema: rscf-link-vnext-roles
+  version: "0.1.0"
+  description: "Minimal link role catalog for RSCF Link vNext."
+roles:
+  primary:
+    description: "Primary control/telemetry link."
+  auxiliary:
+    description: "Secondary or redundant link."
+  service:
+    description: "Service or debug link."
