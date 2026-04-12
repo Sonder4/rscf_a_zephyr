@@ -113,7 +113,7 @@ fi
 python3 -m ensurepip --upgrade >/dev/null 2>&1 || true
 
 python3 -m pip install --upgrade pip
-python3 -m pip install west
+python3 -m pip install west colcon-common-extensions vcstool
 
 if [[ ! -d "${WORKSPACE_DIR}/.west" ]]; then
   west init -m "${MANIFEST_URL}" --mf west.yml -o=--depth=1 "${WORKSPACE_DIR}"

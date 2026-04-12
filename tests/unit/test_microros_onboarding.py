@@ -41,6 +41,12 @@ def test_app_cmake_and_prj_conf_enable_microros_path() -> None:
     assert "CONFIG_RSCF_COMM_SERVICE=n" in prj_conf
 
 
+def test_bootstrap_installs_microros_host_tools_into_repo_venv() -> None:
+    bootstrap = (REPO_ROOT / "scripts" / "bootstrap" / "bootstrap.sh").read_text(encoding="utf-8")
+
+    assert "python3 -m pip install west colcon-common-extensions vcstool" in bootstrap
+
+
 def test_kconfig_and_profile_expose_microros_backend() -> None:
     modules_kconfig = (REPO_ROOT / "modules" / "rscf" / "Kconfig").read_text(encoding="utf-8")
     ros_bridge_c = (REPO_ROOT / "modules" / "rscf" / "services" / "rscf_ros_bridge.c").read_text(encoding="utf-8")
