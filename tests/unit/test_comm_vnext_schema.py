@@ -111,7 +111,7 @@ def test_stale_compat_map_is_rejected(tmp_path):
     module = _load_codegen_module()
 
     def mutate(protocol):
-        protocol["endpoints"]["compat"]["by_mid"]["0x99"] = "ghost_endpoint"
+        protocol["endpoints"]["compat"]["by_mid"]["0x05"] = "mcu_arm"
 
     temp_protocol = _write_temp_protocol(tmp_path, mutate)
     generator = module.load_generator_class()(str(temp_protocol), str(REPO_ROOT))
@@ -123,6 +123,7 @@ def test_invalid_link_endpoint_and_role_are_rejected(tmp_path):
     module = _load_codegen_module()
 
     def mutate(protocol):
+        del protocol["links"]["items"][0]["transport"]
         protocol["links"]["items"][0]["role"] = "ghost_role"
         protocol["links"]["items"][0]["endpoints"] = ["pc_master", "ghost_endpoint"]
 

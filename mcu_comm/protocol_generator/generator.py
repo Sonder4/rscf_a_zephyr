@@ -761,22 +761,22 @@ class ProtocolGenerator:
         links: Dict[str, Any],
         link_roles: Dict[str, Any],
     ) -> bool:
-        endpoint_ids = self._validate_vnext_endpoints(endpoints)
-        if endpoint_ids is None:
+        endpoint_map = self._validate_vnext_endpoints(endpoints)
+        if endpoint_map is None:
             return False
-        if not self._validate_vnext_compat_maps(endpoints.get('compat', {}), endpoint_ids):
+        if not self._validate_vnext_compat_maps(endpoints.get('compat', {}), endpoint_map):
             return False
-        if not self._validate_vnext_links(links, endpoint_ids, link_roles):
+        if not self._validate_vnext_links(links, endpoint_map, link_roles):
             return False
         return True
 
-    def _validate_vnext_endpoints(self, endpoints: Dict[str, Any]) -> Optional[set]:
+    def _validate_vnext_endpoints(self, endpoints: Dict[str, Any]) -> Optional[Dict[str, Dict[str, Any]]]:
         endpoint_items = endpoints.get('items', [])
         if not isinstance(endpoint_items, list):
             logger.error('endpoints.items必须为列表')
             return None
 
-        endpoint_ids = set()
+        endpoint_map: Dict[str, Dict[str, Any]] = {}
         for index, endpoint in enumerate(endpoint_items):
             if not isinstance(endpoint, dict):
                 logger.error(f'endpoints.items[{index}]必须为对象')
@@ -792,14 +792,18 @@ class ProtocolGenerator:
             if endpoint_kind not in self.ALLOWED_VNEXT_ENDPOINT_KINDS:
                 logger.error(f'endpoints.items[{index}] kind非法: {endpoint_kind}')
                 return None
-            if endpoint_id in endpoint_ids:
+            if endpoint_id in endpoint_map:
                 logger.error(f'endpoints.items[{index}] id重复: {endpoint_id}')
                 return None
-            endpoint_ids.add(endpoint_id)
+            endpoint_map[endpoint_id] = endpoint
 
-        return endpoint_ids
+        return endpoint_map
 
-    def _validate_vnext_compat_maps(self, compat_endpoints: Any, endpoint_ids: set) -> bool:
+    def _validate_vnext_compat_maps(
+        self,
+        compat_endpoints: Any,
+        endpoint_map: Dict[str, Dict[str, Any]],
+    ) -> bool:
         if not compat_endpoints:
             return True
         if not isinstance(compat_endpoints, dict):
@@ -814,9 +818,16 @@ class ProtocolGenerator:
                 logger.error(f'endpoints.compat.{compat_key}必须为对象')
                 return False
             for source_key, endpoint_id in compat_map.items():
-                if str(endpoint_id) not in endpoint_ids:
+                endpoint = endpoint_map.get(str(endpoint_id))
+                if endpoint is None:
                     logger.error(
                         f'endpoints.compat.{compat_key}[{source_key}]引用了未知endpoint: {endpoint_id}'
+                    )
+                    return False
+                expected_field = 'mid' if compat_key == 'by_mid' else 'device'
+                if str(endpoint.get(expected_field, '')).strip() != str(source_key).strip():
+                    logger.error(
+                        f'endpoints.compat.{compat_key}[{source_key}]与endpoint {endpoint_id} 不匹配'
                     )
                     return False
         return True
@@ -824,7 +835,7 @@ class ProtocolGenerator:
     def _validate_vnext_links(
         self,
         links: Dict[str, Any],
-        endpoint_ids: set,
+        endpoint_map: Dict[str, Dict[str, Any]],
         link_roles: Dict[str, Any],
     ) -> bool:
         link_items = links.get('items', [])
@@ -842,21 +853,29 @@ class ProtocolGenerator:
                 logger.error(f'links.items[{index}]必须为对象')
                 return False
 
+            link_id = str(link.get('id', '')).strip()
             link_role = str(link.get('role', '')).strip()
+            link_transport = str(link.get('transport', '')).strip()
             link_endpoints = link.get('endpoints', [])
 
+            if not link_id:
+                logger.error(f'links.items[{index}]缺少必要字段id')
+                return False
             if not link_role:
                 logger.error(f'links.items[{index}]缺少必要字段role')
+                return False
+            if not link_transport:
+                logger.error(f'links.items[{index}]缺少必要字段transport')
                 return False
             if allowed_roles and link_role not in allowed_roles:
                 logger.error(f'links.items[{index}] role未在link_roles中定义: {link_role}')
                 return False
-            if not isinstance(link_endpoints, list):
+            if not isinstance(link_endpoints, list) or not link_endpoints:
                 logger.error(f'links.items[{index}].endpoints必须为列表')
                 return False
 
             for endpoint_id in link_endpoints:
-                if str(endpoint_id) not in endpoint_ids:
+                if str(endpoint_id) not in endpoint_map:
                     logger.error(f'links.items[{index}]引用了未知endpoint: {endpoint_id}')
                     return False
 
