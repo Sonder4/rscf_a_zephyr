@@ -12,7 +12,7 @@ should_drop_entry() {
 
     if [ -n "${VIRTUAL_ENV:-}" ]; then
         case "$entry" in
-            "$VIRTUAL_ENV"|"$VIRTUAL_ENV"/*)
+            "$VIRTUAL_ENV")
                 return 0
                 ;;
         esac

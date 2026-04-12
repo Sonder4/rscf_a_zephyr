@@ -134,6 +134,7 @@ def test_libmicroros_build_flow_has_repeatable_rcutils_patch_step() -> None:
     assert 'cp -R "$$pkg_dir/$$pkg_name"/. "$$pkg_dir"/' in libmicroros_mk
     assert 'rm -rf "$$pkg_dir/$$pkg_name"' in libmicroros_mk
     assert "VIRTUAL_ENV" in env_script
+    assert '"$VIRTUAL_ENV"|"$VIRTUAL_ENV"/*' not in env_script
     assert "MICROROS_STRIP_PREFIXES" in env_script
     assert "clean_var AMENT_PREFIX_PATH" in env_script
     assert "clean_var CMAKE_PREFIX_PATH" in env_script
