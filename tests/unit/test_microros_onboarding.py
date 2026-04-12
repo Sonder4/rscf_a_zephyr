@@ -45,6 +45,7 @@ def test_bootstrap_installs_microros_host_tools_into_repo_venv() -> None:
     bootstrap = (REPO_ROOT / "scripts" / "bootstrap" / "bootstrap.sh").read_text(encoding="utf-8")
 
     assert "python3 -m pip install west colcon-common-extensions vcstool" in bootstrap
+    assert 'python3 -m pip install --force-reinstall "setuptools<80" "empy==3.3.4" catkin_pkg lark-parser' in bootstrap
 
 
 def test_kconfig_and_profile_expose_microros_backend() -> None:
@@ -122,6 +123,8 @@ def test_libmicroros_build_flow_has_repeatable_rcutils_patch_step() -> None:
     assert 'link_or_clone "$(MICROROS_LOCAL_MCU_WS)/ros2/rosidl_core"' not in libmicroros_mk
     assert "ROSIDL_TYPESUPPORT_SINGLE_TYPESUPPORT=ON" in colcon_meta
     assert "MICROROS_DEV_PACKAGES" in libmicroros_mk
+    assert "MICROROS_PYTHON ?= $(if $(VIRTUAL_ENV),$(VIRTUAL_ENV)/bin/python3,/usr/bin/python3)" in libmicroros_mk
+    assert "MICROROS_COLCON ?= $(if $(VIRTUAL_ENV),$(VIRTUAL_ENV)/bin/colcon,colcon)" in libmicroros_mk
     assert "--packages-up-to $(MICROROS_DEV_PACKAGES)" in libmicroros_mk
     assert "COLCON_PYTHON_EXECUTABLE=$(MICROROS_PYTHON)" in libmicroros_mk
     assert "PYTHONNOUSERSITE=1" in libmicroros_mk

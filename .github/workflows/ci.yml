@@ -35,7 +35,6 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       ZEPHYR_TOOLCHAIN_VARIANT: gnuarmemb
-      GNUARMEMB_TOOLCHAIN_PATH: /usr
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,12 +52,24 @@ jobs:
             ccache \
             curl \
             device-tree-compiler \
-            gcc-arm-none-eabi \
             git \
             gperf \
             libmagic1 \
             ninja-build \
-            unzip
+            unzip \
+            xz-utils
+
+      - name: Install Arm GNU Toolchain 14.3.rel1
+        run: |
+          TOOLCHAIN_ROOT="$HOME/.local/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi"
+          if [ ! -x "$TOOLCHAIN_ROOT/bin/arm-none-eabi-gcc" ]; then
+            mkdir -p "$HOME/.local"
+            curl -fsSL \
+              https://developer.arm.com/-/media/Files/downloads/gnu/14.3.rel1/binrel/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi.tar.xz \
+              -o /tmp/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi.tar.xz
+            tar -xJf /tmp/arm-gnu-toolchain-14.3.rel1-x86_64-arm-none-eabi.tar.xz -C "$HOME/.local"
+          fi
+          echo "GNUARMEMB_TOOLCHAIN_PATH=$TOOLCHAIN_ROOT" >> "$GITHUB_ENV"
 
       - name: Install host build tools
         run: |

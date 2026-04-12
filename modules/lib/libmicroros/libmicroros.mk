@@ -3,7 +3,8 @@ SHELL := /bin/bash
 UROS_DIR = $(COMPONENT_PATH)/micro_ros_src
 DEBUG ?= 0
 MICROROS_LOCAL_MCU_WS ?=
-MICROROS_PYTHON ?= /usr/bin/python3
+MICROROS_PYTHON ?= $(if $(VIRTUAL_ENV),$(VIRTUAL_ENV)/bin/python3,/usr/bin/python3)
+MICROROS_COLCON ?= $(if $(VIRTUAL_ENV),$(VIRTUAL_ENV)/bin/colcon,colcon)
 MICROROS_DEV_PACKAGES ?= ament_cmake_ros ament_index_cpp ament_index_python ament_package
 
 ifeq ($(DEBUG), 1)
@@ -43,7 +44,7 @@ ZEPHYR_CONF_FILE := $(PROJECT_BINARY_DIR)/.config
 
 get_package_names: $(COMPONENT_PATH)/micro_ros_src/src
 	@cd $(COMPONENT_PATH)/micro_ros_src/src; \
-	colcon list | awk '{print $$1}' | awk -v d=";" '{s=(NR==1?s:s d)$$0}END{print s}'
+	$(MICROROS_COLCON) list | awk '{print $$1}' | awk -v d=";" '{s=(NR==1?s:s d)$$0}END{print s}'
 
 patch_vendor_sources: $(COMPONENT_PATH)/micro_ros_src/src
 	bash $(COMPONENT_PATH)/patch_microros_sources.sh $(COMPONENT_PATH)
@@ -94,7 +95,7 @@ $(COMPONENT_PATH)/micro_ros_dev/install:
 	unset AMENT_PREFIX_PATH COLCON_PREFIX_PATH; \
 	COLCON_PYTHON_EXECUTABLE=$(MICROROS_PYTHON) \
 	PYTHONNOUSERSITE=1 \
-	colcon build \
+	$(MICROROS_COLCON) build \
 		--packages-up-to $(MICROROS_DEV_PACKAGES) \
 		--cmake-clean-cache \
 		--cmake-args \
@@ -163,7 +164,7 @@ $(COMPONENT_PATH)/micro_ros_src/install: patch_vendor_sources configure_colcon_m
 	. $(COMPONENT_PATH)/sanitize_microros_env.sh; \
 	COLCON_PYTHON_EXECUTABLE=$(MICROROS_PYTHON) \
 	PYTHONNOUSERSITE=1 \
-	colcon build \
+	$(MICROROS_COLCON) build \
 		--merge-install \
 		--packages-ignore-regex=.*_cpp \
 		--cmake-clean-cache \
