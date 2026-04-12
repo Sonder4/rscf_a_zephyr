@@ -61,6 +61,14 @@ __attribute__((weak)) void RobotInterfaceOnCompatSystemCmd(const uint8_t *contro
     ARG_UNUSED(len);
 }
 
+void Comm_RegisterCompatEndpoints(void)
+{
+{% for packet in packets %}
+    Comm_RegisterCompatEndpoint(PID_{{ packet.name | to_upper_snake }},
+                                (uint16_t)(0x7000U | PID_{{ packet.name | to_upper_snake }}));
+{% endfor %}
+}
+
 {% for packet in packets %}
 {% if packet.name == 'SYSTEM_CMD' and (packet.direction == 'pc_to_mcu' or packet.direction == 'bidirectional') %}
 static void RobotInterfaceCompatSystemCmdCallback(void* data)
@@ -101,7 +109,7 @@ bool RobotInterfaceInit(void)
     {
         return false;
     }
-    RobotInterfaceOnTransportReady(s_transport_resolved);
+    RobotInterfaceOnTransportReady(Comm_GetTransport());
 
 {% for packet in packets %}
 {% if packet.direction == 'pc_to_mcu' or packet.direction == 'bidirectional' %}

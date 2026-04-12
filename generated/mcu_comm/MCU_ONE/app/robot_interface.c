@@ -61,6 +61,26 @@ __attribute__((weak)) void RobotInterfaceOnCompatSystemCmd(const uint8_t *contro
     ARG_UNUSED(len);
 }
 
+void Comm_RegisterCompatEndpoints(void)
+{
+    Comm_RegisterCompatEndpoint(PID_CHASSIS_CTRL,
+                                (uint16_t)(0x7000U | PID_CHASSIS_CTRL));
+    Comm_RegisterCompatEndpoint(PID_CHASSIS_FEEDBACK,
+                                (uint16_t)(0x7000U | PID_CHASSIS_FEEDBACK));
+    Comm_RegisterCompatEndpoint(PID_MOTOR_DATA,
+                                (uint16_t)(0x7000U | PID_MOTOR_DATA));
+    Comm_RegisterCompatEndpoint(PID_IMU_EULER,
+                                (uint16_t)(0x7000U | PID_IMU_EULER));
+    Comm_RegisterCompatEndpoint(PID_IMU_QUATERNION,
+                                (uint16_t)(0x7000U | PID_IMU_QUATERNION));
+    Comm_RegisterCompatEndpoint(PID_ROBOT_SWITCH,
+                                (uint16_t)(0x7000U | PID_ROBOT_SWITCH));
+    Comm_RegisterCompatEndpoint(PID_SYSTEM_STATUS,
+                                (uint16_t)(0x7000U | PID_SYSTEM_STATUS));
+    Comm_RegisterCompatEndpoint(PID_SYSTEM_CMD,
+                                (uint16_t)(0x7000U | PID_SYSTEM_CMD));
+}
+
 static void RobotInterfaceCompatSystemCmdCallback(void* data)
 {
     systemCmd_t *cmd = (systemCmd_t*)data;
@@ -97,7 +117,7 @@ bool RobotInterfaceInit(void)
     {
         return false;
     }
-    RobotInterfaceOnTransportReady(s_transport_resolved);
+    RobotInterfaceOnTransportReady(Comm_GetTransport());
 
     PID_RegisterCallback(PID_CHASSIS_CTRL, ChassisCtrlCallback);
     PID_RegisterCallback(PID_MOTOR_DATA, MotorDataCallback);

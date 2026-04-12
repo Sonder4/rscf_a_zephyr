@@ -5,10 +5,9 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
+#include "rscf_link_adapter.h"
 #include "rscf_led_status.h"
 #include "robot_interface.h"
-#include "transport_uart.h"
-#include "transport_usb.h"
 
 LOG_MODULE_REGISTER(rscf_comm_service, LOG_LEVEL_INF);
 
@@ -30,57 +29,43 @@ static bool s_comm_ready;
 static Transport_interface_t *s_selected_transport;
 static uint32_t s_last_valid_rx_tick_ms;
 
-static const char *RSCFCommServiceSelectAdapterRole(Transport_interface_t *transport)
+static const char *RSCFCommServiceSelectAdapterRole(const struct rscf_link_adapter *adapter)
 {
-  if (transport == RSCFLinkUsbAdapterGetTransport()) {
-    return "host_usb";
-  }
-
-  if (transport == RSCFLinkUartAdapterGetTransport()) {
-    return "peer_uart";
-  }
-
-  if (transport == RSCFLinkCanAdapterGetTransport()) {
-    return "peer_can";
-  }
-
-  if (transport == RSCFLinkSpiAdapterGetTransport()) {
-    return "peer_spi";
-  }
-
-  return "none";
+  return (adapter != NULL) ? adapter->role : "none";
 }
 
-static Transport_interface_t *RSCFCommServiceSelectTransport(bool *transport_ready,
-                                                             const char **adapter_role)
+static const struct rscf_link_adapter *RSCFCommServiceSelectTransport(bool *transport_ready,
+                                                                      const char **adapter_role)
 {
-  Transport_interface_t *transport = NULL;
+  const struct rscf_link_adapter *adapter = NULL;
   bool ready = false;
 
 #if MCU_COMM_DEFAULT_TRANSPORT == MCU_COMM_TRANSPORT_CAN
-  transport = RSCFLinkCanAdapterGetTransport();
-  ready = RSCFLinkCanAdapterIsReady();
+  adapter = RSCFLinkCanAdapterGet();
 #elif MCU_COMM_DEFAULT_TRANSPORT == MCU_COMM_TRANSPORT_UART
-  transport = RSCFLinkUartAdapterGetTransport();
-  ready = RSCFLinkUartAdapterIsReady();
+  adapter = RSCFLinkUartAdapterGet();
 #else
-  transport = RSCFLinkUsbAdapterGetTransport();
-  ready = RSCFLinkUsbAdapterIsReady();
+  adapter = RSCFLinkUsbAdapterGet();
 #endif
 
-  if (!ready) {
-    transport = RSCFLinkUartAdapterGetTransport();
-    ready = RSCFLinkUartAdapterIsReady();
+  if ((adapter != NULL) && (adapter->is_ready != NULL)) {
+    ready = adapter->is_ready();
   }
 
   if (!ready) {
-    transport = RSCFLinkCanAdapterGetTransport();
-    ready = RSCFLinkCanAdapterIsReady();
+    adapter = RSCFLinkUartAdapterGet();
+    ready = (adapter != NULL) && (adapter->is_ready != NULL) && adapter->is_ready();
   }
 
   if (!ready) {
-    transport = RSCFLinkSpiAdapterGetTransport();
-    ready = (transport != NULL) && RSCFLinkSpiAdapterIsReady();
+    adapter = RSCFLinkCanAdapterGet();
+    ready = (adapter != NULL) && (adapter->is_ready != NULL) && adapter->is_ready();
+  }
+
+  if (!ready) {
+    adapter = RSCFLinkSpiAdapterGet();
+    ready = (adapter != NULL) && (adapter->transport != NULL) &&
+            (adapter->is_ready != NULL) && adapter->is_ready();
   }
 
   if (transport_ready != NULL) {
@@ -88,10 +73,10 @@ static Transport_interface_t *RSCFCommServiceSelectTransport(bool *transport_rea
   }
 
   if (adapter_role != NULL) {
-    *adapter_role = RSCFCommServiceSelectAdapterRole(transport);
+    *adapter_role = RSCFCommServiceSelectAdapterRole(adapter);
   }
 
-  return transport;
+  return adapter;
 }
 
 static void RSCFCommServiceUpdateLed(uint32_t now_ms)
@@ -119,12 +104,14 @@ void Comm_OnValidRxFrame(uint8_t pid)
 
 int RSCFCommServiceInit(void)
 {
+  const struct rscf_link_adapter *adapter = NULL;
   bool transport_ready = false;
   const char *adapter_role = "none";
   int ret;
 
   /* 这里只做 host/peer 传输骨架选择，不引入 Task 5 的桥接逻辑。 */
-  s_selected_transport = RSCFCommServiceSelectTransport(&transport_ready, &adapter_role);
+  adapter = RSCFCommServiceSelectTransport(&transport_ready, &adapter_role);
+  s_selected_transport = (adapter != NULL) ? adapter->transport : NULL;
   s_comm_ready = transport_ready && (s_selected_transport != NULL);
   s_last_valid_rx_tick_ms = 0U;
   RSCFCommServiceUpdateLed(k_uptime_get_32());
@@ -142,9 +129,7 @@ int RSCFCommServiceInit(void)
 
   LOG_INF("comm service ready=%d transport=%s role=%s",
           s_comm_ready ? 1 : 0,
-          (s_selected_transport == &g_usb_transport) ? "usb" :
-          (s_selected_transport == &g_can_transport) ? "can" :
-          (s_selected_transport == &g_uart_transport) ? "uart" : "none",
+          (adapter != NULL) ? adapter->name : "none",
           adapter_role);
   return 0;
 }

@@ -18,6 +18,8 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <zephyr/sys/util.h>
+
 #include "bsp_log.h"
 #include "transport_can.h"
 #include "transport_uart.h"
@@ -42,6 +44,8 @@ static uint8_t is_batch_mode = 0;
 static uint16_t batch_len = 0;
 static uint32_t s_callback_count[256] = {0};
 static uint32_t s_total_callback_count = 0;
+static uint16_t s_compat_endpoint_map[256] = {0};
+static uint8_t s_compat_endpoint_valid[256] = {0};
 
 static Transport_interface_t* Comm_SelectDefaultTransport(void)
 {
@@ -71,13 +75,41 @@ __attribute__((weak)) void Comm_OnTransportResolved(Transport_interface_t* trans
 
 __attribute__((weak)) uint16_t Comm_CompatMapEndpoint(uint8_t pid)
 {
+    if (s_compat_endpoint_valid[pid] != 0U)
+    {
+        return s_compat_endpoint_map[pid];
+    }
+
     return (uint16_t)pid;
+}
+
+__attribute__((weak)) void Comm_RegisterCompatEndpoints(void)
+{
+}
+
+__attribute__((weak)) void Comm_OnCompatEndpointResolved(uint8_t pid, uint16_t endpoint_id)
+{
+    ARG_UNUSED(pid);
+    ARG_UNUSED(endpoint_id);
+}
+
+Transport_interface_t* Comm_GetTransport(void)
+{
+    return g_transport;
+}
+
+void Comm_RegisterCompatEndpoint(uint8_t pid, uint16_t endpoint_id)
+{
+    s_compat_endpoint_map[pid] = endpoint_id;
+    s_compat_endpoint_valid[pid] = 1U;
 }
 
 int Comm_Init(Transport_interface_t* transport)
 {
     int ret = 0;
 
+    memset(s_compat_endpoint_map, 0, sizeof(s_compat_endpoint_map));
+    memset(s_compat_endpoint_valid, 0, sizeof(s_compat_endpoint_valid));
     g_transport = transport;
     if (g_transport == NULL)
     {
@@ -94,6 +126,7 @@ int Comm_Init(Transport_interface_t* transport)
 
     ProtocolFrame_Init(&rx_frame);
     PID_Registry_Init();
+    Comm_RegisterCompatEndpoints();
     return ret;
 }
 
@@ -212,7 +245,7 @@ void Comm_ProcessRx(void)
             {
                 uint8_t pid = rx_frame.pid;
                 uint16_t compat_endpoint = Comm_CompatMapEndpoint(pid);
-                ARG_UNUSED(compat_endpoint);
+                Comm_OnCompatEndpointResolved(pid, compat_endpoint);
                 Comm_OnValidRxFrame(pid);
                 if (pid_registry[pid].callback != NULL)
                 {
