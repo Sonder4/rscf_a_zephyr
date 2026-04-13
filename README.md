@@ -12,7 +12,7 @@
 | 目标板卡 | `RSCF A` |
 | Zephyr 基线 | `v4.3.0` |
 | 默认工具链 | `gnuarmemb` |
-| 默认下位机通信主链 | `USB CDC ACM + micro-ROS` |
+| 默认下位机通信主链 | `USB CDC ACM + RSCF Link vNext` |
 | 保留的兼容能力 | `mcu_comm` 代码生成与旧模块兼容层 |
 | 板级硬件真源快照 | `docs/ioc_json/*.json` |
 
@@ -58,6 +58,7 @@
   - 已切换为仓库内置 `CMSIS-DSP`
 - 主机构件
   - `ros2_ws/` 中包含与下位机交互的 ROS 2 功能包与 launch 文件
+  - `ros2_ws/src/rscf_link_bridge`
 - CI
   - 当前已具备 `unit-tests`
   - 当前已具备 `firmware-build`
@@ -104,19 +105,28 @@
 
 当前仓库默认主线是：
 
-- 下位机端：`micro-ROS`
+- 下位机端：`RSCF Link vNext runtime`
 - 物理链路：`USB CDC ACM`
-- 上位机端：`ros2_ws/src/rscf_a_host`
+- 上位机端：`ros2_ws/src/rscf_link_bridge`
+- 多 MCU 侧链路：`peer link (UART/CAN/SPI skeleton)`
 
-仓库中仍保留了 `mcu_comm` 代码生成链，但它当前不是默认通信主线。
+仓库中仍保留了 `mcu_comm` 代码生成链和 `micro-ROS`，但它们当前都不是默认主线：
+
+- `mcu_comm` 继续作为 compat/control-plane 生成基础保留
+- `micro-ROS` 作为兼容后端保留，可按需重新启用
 
 默认 ROS 2 主题约定：
 
 - 下行：`/cmd_vel`
-- 下行：`/rscf/heading_target_deg`
+- 上行：`/rscf/system_status`
 - 上行：`/odom`
 - 上行：`/imu/data`
-- 上行：`/rscf/system_status`
+
+当前默认 bridge skeleton 已显式声明参数：
+
+- `device_path`
+- `baudrate`
+- `compat_mode`
 
 ## 快速开始
 
@@ -149,13 +159,13 @@ cd .workspace
 ### 3. 构建固件
 
 ```bash
-west build -b rscf_a_f427iih6 ../app -d build_microros
+west build -b rscf_a_f427iih6 ../app -d build_vnext
 ```
 
 生成的主要产物位于：
 
-- `.workspace/build_microros/zephyr/zephyr.elf`
-- `.workspace/build_microros/zephyr/zephyr.hex`
+- `.workspace/build_vnext/zephyr/zephyr.elf`
+- `.workspace/build_vnext/zephyr/zephyr.hex`
 
 ### 4. 烧录固件
 
@@ -171,18 +181,19 @@ west flash
 
 ```bash
 source /opt/ros/humble/setup.bash
-source /home/xuan/microros_ws/agent_ws/install/setup.bash
 cd ros2_ws
 colcon build
 source install/setup.bash
-ros2 launch rscf_a_host rscf_host_io.launch.py start_agent:=true serial_device:=/dev/ttyACM0
+ros2 launch rscf_link_bridge rscf_link_bridge.launch.py device_path:=/dev/ttyACM0 baudrate:=115200 compat_mode:=true
 ```
 
-这个 launch 会按需启动：
+当前 `compat_mode` 默认值仍为 `true`，这是 bridge skeleton 阶段保留旧状态字和旧负载形态的兼容参数，不代表默认后端回退到 `micro-ROS`。
 
-- `micro_ros_agent`
-- `rscf_monitor`
-- `rscf_command_profile`
+默认桥接 launch 当前会启动：
+
+- `rscf_link_bridge_node`
+
+旧的 `rscf_a_host` 与 `micro_ros_agent` 路径仍保留在仓库中，但属于兼容链路，不再是 README 默认路径。
 
 ## 板级与硬件来源
 
@@ -211,6 +222,8 @@ ros2 launch rscf_a_host rscf_host_io.launch.py start_agent:=true serial_device:=
   - RSCF 板级设备驱动
 - `modules/rscf/`
   - 服务层、设备层、应用 profile
+- `generated/mcu_comm/`
+  - compat endpoint / generated mirror
 - `modules/compat/`
   - 旧工程兼容模块
 - `modules/motor/`
@@ -233,7 +246,8 @@ ros2 launch rscf_a_host rscf_host_io.launch.py start_agent:=true serial_device:=
 
 ## 已知限制
 
-- 当前默认只保证 `USB CDC ACM + micro-ROS` 主链持续可维护
+- 当前默认主线已经切换为 `USB CDC ACM + RSCF Link vNext + rscf_link_bridge`
+- `micro-ROS` 为兼容后端，不再是默认启动链路
 - `I2C2/OLED` 已从当前板级主线中暂时排除
 - `TIM2` 在旧工程中属于混合用途
   - `PA0/PA1` 为编码器输入

@@ -112,43 +112,47 @@
 
 当前项目的 ROS 主路径是：
 
-- MCU 端：`micro-ROS`
+- MCU 端：`RSCF Link vNext`
 - 物理传输：`USB CDC ACM`
-- Host 端：当前仓库内 `ros2_ws/src/rscf_a_host`
+- Host 端：当前仓库内 `ros2_ws/src/rscf_link_bridge`
+- 多 MCU 侧链路：`peer link (UART/CAN/SPI skeleton)`
 
-当前 Host 端已经收口为：
+当前 Host 端主线已经收口为：
 
-- `micro_ros_agent serial`
-- `rscf_monitor`
-- `rscf_command_profile`
-- `rscf_host_io.launch.py`
+- `rscf_link_bridge_node`
+- `rscf_link_bridge.launch.py`
 
-`modules/rscf/services/rscf_ros_bridge.c` 现在明确声明当前 backend 是：
+当前仓库仍保留：
 
-- `RSCF_ROS_BACKEND_MICROROS`
+- `micro-ROS`
+- `rscf_a_host`
 
-当前默认 topic 约定是：
+但它们当前都属于兼容路径，不再是默认 backend。
+
+`modules/rscf/Kconfig` 当前默认 backend 是：
+
+- `RSCF_ROS_BACKEND_BRIDGE`
+
+当前 bridge skeleton 已声明的主题/参数包括：
 
 - 下行：`/cmd_vel`
-- 下行：`/rscf/heading_target_deg`
+- 上行：`/rscf/system_status`
 - 上行：`/odom`
 - 上行：`/imu/data`
-- 上行：`/rscf/system_status`
+- 参数：`device_path`
+- 参数：`baudrate`
+- 参数：`compat_mode`
 
-其中：
-
-- `/odom` 当前走 reliable publisher
-- `/imu/data` 当前走 best-effort publisher
-- `/rscf/system_status` 当前用于链路状态和功能位解码
+这里的 `compat_mode` 当前默认仍为 `true`，只是 bridge skeleton 阶段为了兼容旧状态字和旧负载形态而保留的参数，不代表默认 backend 已切回 `micro-ROS`。
 
 ### 2.5 当前工程如何判定“移植是活的”
 
 至少满足以下四点时，可以认为当前 Zephyr 工程主线是活的：
 
-- `west build -b rscf_a_f427iih6 ../app -d build_microros` 成功
+- `west build -b rscf_a_f427iih6 ../app -d build_vnext` 成功
 - 单元测试通过
 - 板子可刷入 `zephyr.hex`
-- 上电后 USB CDC 能稳定枚举，并能与 `micro_ros_agent` 建链
+- 上电后 USB CDC 能稳定枚举，并能与 `rscf_link_bridge` 建链
 
 ---
 
@@ -1284,22 +1288,23 @@ RSCFEventBusConsume(&s_sub, &data, &updated);
 - `mhall`
 - `OLED`
 
-### 9.2 当前 ROS 主链路已经是 micro-ROS
+### 9.2 当前 ROS 主链路已经切到 bridge-default
 
-这一条已经过期。
+当前默认链路是：
 
-当前实际状态是：
+- MCU 侧运行 `RSCF Link vNext runtime`
+- Host 侧运行 `ros2_ws/src/rscf_link_bridge`
+- 物理主链路是 `USB CDC ACM`
 
-- 板子运行 `micro-ROS client`
-- Host 侧运行 `micro_ros_agent`
-- 当前仓库内的 `ros2_ws` 负责监控、命令下发和联调入口
+仓库中仍然保留：
 
-不要把现在的工程继续理解为：
+- `micro-ROS`
+- `rscf_a_host`
+- `mcu_comm` 代码生成链
 
-- MCU 侧只发 `mcu_comm`
-- PC 侧再做协议桥接
+但它们现在都属于兼容路径或历史资产，不再是当前仓库默认主线。
 
-`mcu_comm` 相关代码和代码生成器仍然保留在仓库中，主要用于兼容旧协议链和继续维护协议资产，但当前 USB 主链路已经切到 `micro-ROS`。
+其中 `compat_mode` 默认仍为 `true`，只是 bridge skeleton 阶段用于保持旧状态字/旧负载形态的一层兼容参数，不应被理解成“系统默认走 micro-ROS”。
 
 ### 9.3 当前 APP 骨架仍偏底盘主线
 
