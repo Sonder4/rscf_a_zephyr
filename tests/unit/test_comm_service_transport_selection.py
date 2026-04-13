@@ -30,21 +30,17 @@ def test_devicetree_links_have_host_and_peer_bindings() -> None:
     board_dts = (REPO_ROOT / "boards" / "arm" / "rscf_a_f427iih6" / "rscf_a_f427iih6.dts").read_text(
         encoding="utf-8"
     )
-    app_overlay = (REPO_ROOT / "app" / "app.overlay").read_text(encoding="utf-8")
     board_overlay = (
         REPO_ROOT / "app" / "boards" / "rscf_a_f427iih6.overlay"
     ).read_text(encoding="utf-8")
 
     assert "rscf,peer-link" in board_dts
     assert "rscf-peer-uart" in board_dts
-    assert "cdc_acm_uart0: cdc_acm_uart0" in app_overlay
-    assert "&usbotg_fs {" in app_overlay
+    assert "cdc_acm_uart0: cdc_acm_uart0" in board_overlay
+    assert "&usbotg_fs {" in board_overlay
     assert "rscf,host-link" in board_overlay
     assert "rscf-host-usb" in board_overlay
-    assert "&usbotg_fs {" not in board_overlay
-    assert "cdc_acm_uart0: cdc_acm_uart0" not in board_overlay
-    assert app_overlay.count("cdc_acm_uart0: cdc_acm_uart0") == 1
-    assert app_overlay.count("{") == app_overlay.count("}")
+    assert board_overlay.count("cdc_acm_uart0: cdc_acm_uart0") == 1
     assert board_overlay.count("{") == board_overlay.count("}")
     assert board_overlay.count("rscf,host-link") == 1
     assert board_overlay.count("rscf-host-usb") == 1

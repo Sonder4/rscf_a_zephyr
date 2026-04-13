@@ -172,7 +172,6 @@ target_sources(app PRIVATE
   ../modules/rscf/services/rscf_daemon_service.c
   ../modules/rscf/services/rscf_health_service.c
   ../modules/rscf/services/rscf_comm_service.c
-  ../modules/rscf/services/rscf_microros_service.c
   ../modules/rscf/services/rscf_chassis_service.c
   ../modules/rscf/services/rscf_robot_service.c
   ../modules/rscf/services/rscf_ros_bridge.c
@@ -186,3 +185,9 @@ target_sources(app PRIVATE
 
 add_dependencies(app rscf_mcu_comm_codegen)
 add_dependencies(app rscf_ioc_validate)
+
+if(CONFIG_RSCF_MICROROS_SERVICE)
+  target_sources(app PRIVATE
+    ../modules/rscf/services/rscf_microros_service.c
+  )
+endif()

@@ -7,3 +7,9 @@
 		rscf-host-usb = &cdc_acm_uart0;
 	};
 };
+
+&usbotg_fs {
+	cdc_acm_uart0: cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+	};
+};

@@ -7,12 +7,13 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_usb_board_overlay_and_prj_conf_present():
-    app_overlay = (REPO_ROOT / "app" / "app.overlay").read_text(encoding="utf-8")
     overlay = REPO_ROOT / "app" / "boards" / "rscf_a_f427iih6.overlay"
+    board_overlay = overlay.read_text(encoding="utf-8")
     prj_conf = (REPO_ROOT / "app" / "prj.conf").read_text(encoding="utf-8")
 
-    assert 'compatible = "zephyr,cdc-acm-uart";' in app_overlay
     assert overlay.exists()
+    assert 'compatible = "zephyr,cdc-acm-uart";' in board_overlay
+    assert "cdc_acm_uart0: cdc_acm_uart0" in board_overlay
 
     assert "CONFIG_USB_DEVICE_STACK=y" in prj_conf
     assert "CONFIG_USB_CDC_ACM=y" in prj_conf

@@ -1,3 +1,5 @@
+#include <stddef.h>
+
 #include "rscf_link_adapter.h"
 
 static bool rscf_link_spi_is_ready(void)
