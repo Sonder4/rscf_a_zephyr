@@ -28,6 +28,7 @@ static bool g_is_initialized = false;
 static void* s_robot_tx_task_handle = NULL;
 static uint32_t s_pending_tx_events;
 static Transport_interface_t* s_transport_override = NULL;
+static Transport_interface_t* s_transport_resolved = NULL;
 
 __attribute__((weak)) void RobotInterfaceTxPeriodicHook(void)
 {
@@ -37,6 +38,61 @@ __attribute__((weak)) void RobotInterfaceTxEventHook(uint32_t tx_events)
 {
     ARG_UNUSED(tx_events);
 }
+
+__attribute__((weak)) Transport_interface_t* RobotInterfaceResolveTransportOverride(Transport_interface_t* transport)
+{
+    return transport;
+}
+
+__attribute__((weak)) void RobotInterfaceOnTransportReady(Transport_interface_t* transport)
+{
+    ARG_UNUSED(transport);
+}
+
+__attribute__((weak)) void RobotInterfaceFillCompatSystemStatus(uint8_t *control_plane_bytes, uint16_t len)
+{
+    ARG_UNUSED(control_plane_bytes);
+    ARG_UNUSED(len);
+}
+
+__attribute__((weak)) void RobotInterfaceOnCompatSystemCmd(const uint8_t *control_plane_bytes, uint16_t len)
+{
+    ARG_UNUSED(control_plane_bytes);
+    ARG_UNUSED(len);
+}
+
+void Comm_RegisterCompatEndpoints(void)
+{
+    Comm_RegisterCompatEndpoint(PID_CHASSIS_CTRL,
+                                (uint16_t)(0x7000U | PID_CHASSIS_CTRL));
+    Comm_RegisterCompatEndpoint(PID_CHASSIS_FEEDBACK,
+                                (uint16_t)(0x7000U | PID_CHASSIS_FEEDBACK));
+    Comm_RegisterCompatEndpoint(PID_MOTOR_DATA,
+                                (uint16_t)(0x7000U | PID_MOTOR_DATA));
+    Comm_RegisterCompatEndpoint(PID_IMU_EULER,
+                                (uint16_t)(0x7000U | PID_IMU_EULER));
+    Comm_RegisterCompatEndpoint(PID_IMU_QUATERNION,
+                                (uint16_t)(0x7000U | PID_IMU_QUATERNION));
+    Comm_RegisterCompatEndpoint(PID_ROBOT_SWITCH,
+                                (uint16_t)(0x7000U | PID_ROBOT_SWITCH));
+    Comm_RegisterCompatEndpoint(PID_SYSTEM_STATUS,
+                                (uint16_t)(0x7000U | PID_SYSTEM_STATUS));
+    Comm_RegisterCompatEndpoint(PID_SYSTEM_CMD,
+                                (uint16_t)(0x7000U | PID_SYSTEM_CMD));
+}
+
+static void RobotInterfaceCompatSystemCmdCallback(void* data)
+{
+    systemCmd_t *cmd = (systemCmd_t*)data;
+
+    if (cmd != NULL)
+    {
+        RobotInterfaceOnCompatSystemCmd(cmd->cmd_bytes, sizeof(cmd->cmd_bytes));
+    }
+
+    SystemCmdCallback(data);
+}
+
 
 #if MCU_COMM_TEST_MODE
 static uint32_t RobotInterfaceGetTickMs(void)
@@ -55,16 +111,18 @@ bool RobotInterfaceInit(void)
     }
 
     PID_Registry_Init();
-    ret = Comm_Init(s_transport_override);
+    s_transport_resolved = RobotInterfaceResolveTransportOverride(s_transport_override);
+    ret = Comm_Init(s_transport_resolved);
     if (ret != 0)
     {
         return false;
     }
+    RobotInterfaceOnTransportReady(Comm_GetTransport());
 
     PID_RegisterCallback(PID_CHASSIS_CTRL, ChassisCtrlCallback);
     PID_RegisterCallback(PID_MOTOR_DATA, MotorDataCallback);
     PID_RegisterCallback(PID_ROBOT_SWITCH, RobotSwitchCallback);
-    PID_RegisterCallback(PID_SYSTEM_CMD, SystemCmdCallback);
+    PID_RegisterCallback(PID_SYSTEM_CMD, RobotInterfaceCompatSystemCmdCallback);
 
     g_is_initialized = true;
     return true;
@@ -74,6 +132,7 @@ void RobotInterfaceDeinit(void)
 {
     g_is_initialized = false;
     s_pending_tx_events = 0U;
+    s_transport_resolved = NULL;
 }
 
 void RobotInterfaceSetTransport(Transport_interface_t* transport)
@@ -175,6 +234,8 @@ bool RobotSendSystemStatus(const uint8_t *control_plane_bytes)
                control_plane_bytes,
                sizeof(data.status_bytes));
     }
+    RobotInterfaceFillCompatSystemStatus(data.status_bytes,
+                                         sizeof(data.status_bytes));
 
     Comm_Send(DEVICE_MID, PID_SYSTEM_STATUS, (uint8_t*)&data, sizeof(data));
     return true;

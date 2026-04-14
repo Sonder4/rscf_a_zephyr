@@ -73,7 +73,7 @@ int RSCFEventBusInit(void)
   s_initialized = true;
   k_spin_unlock(&s_event_bus_lock, key);
 
-  LOG_INF("event bus initialized");
+  LOG_INF("event bus initialized as local service bus");
   return 0;
 }
 

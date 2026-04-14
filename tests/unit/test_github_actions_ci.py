@@ -15,8 +15,10 @@ def test_ci_workflow_covers_repo_contracts() -> None:
     assert "actions/checkout@v4" in workflow
     assert "actions/setup-python@v5" in workflow
     assert "actions/upload-artifact@v4" in workflow
+    assert 'PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"' in workflow
+    assert "workflow_dispatch:" in workflow
     assert "python -m pytest tests/unit -q" in workflow
-    assert "west build -b rscf_a_f427iih6 ../app -d build_microros" in workflow
+    assert "west build -b rscf_a_f427iih6 ../app -d build_vnext" in workflow
     assert "cd ros2_ws" in workflow
     assert "colcon build" in workflow
     assert "ubuntu-22.04" in workflow

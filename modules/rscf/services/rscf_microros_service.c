@@ -33,6 +33,8 @@
 
 LOG_MODULE_REGISTER(rscf_microros_service, LOG_LEVEL_INF);
 
+/* 兼容后端：仅在显式选择 micro-ROS backend 时启用。 */
+
 #define RSCF_MICROROS_RETRY_PERIOD_MS 250U
 #define RSCF_MICROROS_AGENT_PING_TIMEOUT_MS 10U
 #define RSCF_MICROROS_CMD_TIMEOUT_MS 100U
@@ -704,7 +706,7 @@ int RSCFMicroRosServiceInit(void)
     s_microros.transport_ready = true;
     s_microros.last_cmd_tick_ms = k_uptime_get_32();
     s_microros.last_retry_tick_ms = 0U;
-    LOG_INF("micro-ROS service ready, waiting for agent");
+    LOG_INF("micro-ROS compatibility backend ready, waiting for agent");
     return 0;
 }
 

@@ -65,3 +65,41 @@ def test_codegen_emits_serial_only_ros2_host_package():
 
         assert '"pc_comm_type": "serial"' in config_json
         assert '"tcp_host"' not in config_json
+
+
+def test_task4_mcu_side_hooks_do_not_expand_ros2_only_codegen_scope():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_dir = Path(temp_dir) / "ros2_pkg"
+        script = REPO_ROOT / "mcu_comm" / "protocol_generator" / "generator.py"
+        protocol = REPO_ROOT / "mcu_comm" / "protocol_generator" / "protocol_definition.json"
+
+        subprocess.run(
+            [
+                "python3",
+                str(script),
+                "-i",
+                str(protocol),
+                "-o",
+                str(output_dir),
+                "--ros2-only",
+            ],
+            check=True,
+            cwd=REPO_ROOT,
+        )
+
+        cmake_lists = (output_dir / "CMakeLists.txt").read_text(encoding="utf-8")
+        node_hpp = (output_dir / "include" / "node" / "mcu_comm_node.hpp").read_text(encoding="utf-8")
+        node_cpp = (output_dir / "src" / "node" / "mcu_comm_node.cpp").read_text(encoding="utf-8")
+
+        assert "rscf_link_usb" not in cmake_lists
+        assert "rscf_link_uart" not in cmake_lists
+        assert "rscf_link_can" not in cmake_lists
+        assert "rscf_link_spi" not in cmake_lists
+
+        assert "Comm_ResolveTransportOrDefault" not in node_hpp
+        assert "Comm_OnTransportResolved" not in node_hpp
+        assert "RobotInterfaceResolveTransportOverride" not in node_hpp
+
+        assert "Comm_ResolveTransportOrDefault" not in node_cpp
+        assert "Comm_OnTransportResolved" not in node_cpp
+        assert "RobotInterfaceOnCompatSystemCmd" not in node_cpp

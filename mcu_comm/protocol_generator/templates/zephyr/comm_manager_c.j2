@@ -18,6 +18,8 @@
 #include <stddef.h>
 #include <string.h>
 
+#include <zephyr/sys/util.h>
+
 #include "bsp_log.h"
 #include "transport_can.h"
 #include "transport_uart.h"
@@ -42,27 +44,80 @@ static uint8_t is_batch_mode = 0;
 static uint16_t batch_len = 0;
 static uint32_t s_callback_count[256] = {0};
 static uint32_t s_total_callback_count = 0;
+static uint16_t s_compat_endpoint_map[256] = {0};
+static uint8_t s_compat_endpoint_valid[256] = {0};
+
+static Transport_interface_t* Comm_SelectDefaultTransport(void)
+{
+#if MCU_COMM_DEFAULT_TRANSPORT == MCU_COMM_TRANSPORT_CAN
+    return &g_can_transport;
+#elif MCU_COMM_DEFAULT_TRANSPORT == MCU_COMM_TRANSPORT_UART
+    return &g_uart_transport;
+#else
+    return &g_usb_transport;
+#endif
+}
 
 __attribute__((weak)) void Comm_OnValidRxFrame(uint8_t pid)
 {
     (void)pid;
 }
 
+__attribute__((weak)) Transport_interface_t* Comm_ResolveTransportOrDefault(Transport_interface_t* transport)
+{
+    return transport;
+}
+
+__attribute__((weak)) void Comm_OnTransportResolved(Transport_interface_t* transport)
+{
+    ARG_UNUSED(transport);
+}
+
+__attribute__((weak)) uint16_t Comm_CompatMapEndpoint(uint8_t pid)
+{
+    if (s_compat_endpoint_valid[pid] != 0U)
+    {
+        return s_compat_endpoint_map[pid];
+    }
+
+    return (uint16_t)pid;
+}
+
+__attribute__((weak)) void Comm_RegisterCompatEndpoints(void)
+{
+}
+
+__attribute__((weak)) void Comm_OnCompatEndpointResolved(uint8_t pid, uint16_t endpoint_id)
+{
+    ARG_UNUSED(pid);
+    ARG_UNUSED(endpoint_id);
+}
+
+Transport_interface_t* Comm_GetTransport(void)
+{
+    return g_transport;
+}
+
+void Comm_RegisterCompatEndpoint(uint8_t pid, uint16_t endpoint_id)
+{
+    s_compat_endpoint_map[pid] = endpoint_id;
+    s_compat_endpoint_valid[pid] = 1U;
+}
+
 int Comm_Init(Transport_interface_t* transport)
 {
     int ret = 0;
 
+    memset(s_compat_endpoint_map, 0, sizeof(s_compat_endpoint_map));
+    memset(s_compat_endpoint_valid, 0, sizeof(s_compat_endpoint_valid));
     g_transport = transport;
     if (g_transport == NULL)
     {
-#if MCU_COMM_DEFAULT_TRANSPORT == MCU_COMM_TRANSPORT_CAN
-        g_transport = &g_can_transport;
-#elif MCU_COMM_DEFAULT_TRANSPORT == MCU_COMM_TRANSPORT_UART
-        g_transport = &g_uart_transport;
-#else
-        g_transport = &g_usb_transport;
-#endif
+        g_transport = Comm_SelectDefaultTransport();
     }
+
+    g_transport = Comm_ResolveTransportOrDefault(g_transport);
+    Comm_OnTransportResolved(g_transport);
 
     if ((g_transport != NULL) && (g_transport->init != NULL))
     {
@@ -71,6 +126,7 @@ int Comm_Init(Transport_interface_t* transport)
 
     ProtocolFrame_Init(&rx_frame);
     PID_Registry_Init();
+    Comm_RegisterCompatEndpoints();
     return ret;
 }
 
@@ -188,6 +244,8 @@ void Comm_ProcessRx(void)
             if (status == 3)
             {
                 uint8_t pid = rx_frame.pid;
+                uint16_t compat_endpoint = Comm_CompatMapEndpoint(pid);
+                Comm_OnCompatEndpointResolved(pid, compat_endpoint);
                 Comm_OnValidRxFrame(pid);
                 if (pid_registry[pid].callback != NULL)
                 {

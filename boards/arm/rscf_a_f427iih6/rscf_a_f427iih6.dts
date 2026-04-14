@@ -16,6 +16,7 @@
     zephyr,shell-uart = &usart1;
     zephyr,sram = &sram0;
     zephyr,flash = &flash0;
+    rscf,peer-link = &uart7;
   };
 
   aliases {
@@ -29,6 +30,7 @@
     led7 = &led7;
     led8 = &led8;
     sw0 = &user_button;
+    rscf-peer-uart = &uart7;
   };
 
   leds {

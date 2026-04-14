@@ -22,7 +22,7 @@ def test_microros_module_and_service_scaffold_exist() -> None:
         assert (REPO_ROOT / relpath).is_file(), relpath
 
 
-def test_app_cmake_and_prj_conf_enable_microros_path() -> None:
+def test_app_cmake_and_prj_conf_keep_microros_path_available() -> None:
     app_cmake = (REPO_ROOT / "app" / "CMakeLists.txt").read_text(encoding="utf-8")
     microros_module_cmake = (REPO_ROOT / "modules" / "lib" / "libmicroros" / "CMakeLists.txt").read_text(
         encoding="utf-8"
@@ -35,10 +35,11 @@ def test_app_cmake_and_prj_conf_enable_microros_path() -> None:
     assert "get_package_names" not in microros_module_cmake
     assert "execute_process(" not in microros_module_cmake
 
-    assert "CONFIG_RSCF_ROS_BACKEND_MICROROS=y" in prj_conf
-    assert "CONFIG_RSCF_MICROROS_SERVICE=y" in prj_conf
-    assert "CONFIG_RSCF_MICROROS_SIM_MODE=y" in prj_conf
-    assert "CONFIG_RSCF_COMM_SERVICE=n" in prj_conf
+    assert "CONFIG_RSCF_ROS_BACKEND_BRIDGE=y" in prj_conf
+    assert "CONFIG_RSCF_ROS_BACKEND_MICROROS=n" in prj_conf
+    assert "CONFIG_RSCF_MICROROS_SERVICE=y" not in prj_conf
+    assert "CONFIG_RSCF_MICROROS_SIM_MODE=y" not in prj_conf
+    assert "CONFIG_RSCF_COMM_SERVICE=y" in prj_conf
 
 
 def test_bootstrap_installs_microros_host_tools_into_repo_venv() -> None:
@@ -51,8 +52,13 @@ def test_bootstrap_installs_microros_host_tools_into_repo_venv() -> None:
 def test_kconfig_and_profile_expose_microros_backend() -> None:
     modules_kconfig = (REPO_ROOT / "modules" / "rscf" / "Kconfig").read_text(encoding="utf-8")
     ros_bridge_c = (REPO_ROOT / "modules" / "rscf" / "services" / "rscf_ros_bridge.c").read_text(encoding="utf-8")
+    microros_service_c = (REPO_ROOT / "modules" / "rscf" / "services" / "rscf_microros_service.c").read_text(
+        encoding="utf-8"
+    )
 
     assert "config RSCF_ROS_BACKEND_MICROROS" in modules_kconfig
+    assert "Use host ROS2 bridge backend (default)" in modules_kconfig
+    assert "Use micro-ROS compatibility backend" in modules_kconfig
     assert "config RSCF_MICROROS_SERVICE" in modules_kconfig
     assert "config RSCF_MICROROS_SIM_MODE" in modules_kconfig
     assert "config RSCF_MICROROS_ODOM_RATE_HZ" in modules_kconfig
@@ -62,6 +68,8 @@ def test_kconfig_and_profile_expose_microros_backend() -> None:
     assert "RSCFMicroRosServiceTick" in ros_bridge_c
     assert "RSCF_ROS_BACKEND_MICROROS" in ros_bridge_c
     assert "micro_ros_usb" in ros_bridge_c
+    assert "兼容后端" in microros_service_c
+    assert "micro-ROS compatibility backend ready" in microros_service_c
 
 
 def test_microros_service_targets_200hz_usb_sim_bridge() -> None:

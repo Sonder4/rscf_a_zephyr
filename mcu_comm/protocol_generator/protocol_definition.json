@@ -117,6 +117,85 @@
       "device_path": "/dev/serial/by-id/usb-ZEPHYR_RSCF_A_CDC_ACM_4843500F00410035-if00"
     }
   },
+  "endpoints": {
+    "schema": "endpoint_schema.yaml",
+    "items": [
+      {
+        "id": "pc_master",
+        "kind": "pc",
+        "role": "pc_master",
+        "mid": "0x01",
+        "device": "PC_MASTER"
+      },
+      {
+        "id": "mcu_chassis",
+        "kind": "mcu",
+        "role": "mcu",
+        "mid": "0x03",
+        "device": "MCU_CHASSIS"
+      },
+      {
+        "id": "mcu_arm",
+        "kind": "mcu",
+        "role": "mcu",
+        "mid": "0x04",
+        "device": "MCU_ARM"
+      },
+      {
+        "id": "mcu_one",
+        "kind": "mcu",
+        "role": "mcu",
+        "mid": "0x05",
+        "device": "MCU_ONE"
+      }
+    ],
+    "compat": {
+      "by_mid": {
+        "0x01": "pc_master",
+        "0x03": "mcu_chassis",
+        "0x04": "mcu_arm",
+        "0x05": "mcu_one"
+      },
+      "by_device": {
+        "PC_MASTER": "pc_master",
+        "MCU_CHASSIS": "mcu_chassis",
+        "MCU_ARM": "mcu_arm",
+        "MCU_ONE": "mcu_one"
+      }
+    }
+  },
+  "links": {
+    "roles": "link_roles.yaml",
+    "items": [
+      {
+        "id": "primary_usb",
+        "role": "primary",
+        "transport": "usb",
+        "endpoints": [
+          "pc_master",
+          "mcu_one"
+        ]
+      },
+      {
+        "id": "chassis_usb",
+        "role": "auxiliary",
+        "transport": "usb",
+        "endpoints": [
+          "pc_master",
+          "mcu_chassis"
+        ]
+      },
+      {
+        "id": "arm_usb",
+        "role": "auxiliary",
+        "transport": "usb",
+        "endpoints": [
+          "pc_master",
+          "mcu_arm"
+        ]
+      }
+    ]
+  },
   "link_rate_hz": {
     "mcu_to_pc": 100,
     "pc_to_mcu": 100

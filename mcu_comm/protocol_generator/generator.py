@@ -35,6 +35,8 @@ logger = logging.getLogger(__name__)
 
 class ProtocolGenerator:
     """协议代码生成器主类"""
+
+    ALLOWED_VNEXT_ENDPOINT_KINDS = {'pc', 'mcu', 'bridge'}
     
     # STM32类型长度映射（以STM32为基准）
     # 支持两种格式：带_t后缀和不带_t后缀
@@ -145,6 +147,9 @@ class ProtocolGenerator:
                 return False
 
             if not self._prepare_control_plane_bindings():
+                return False
+
+            if not self._prepare_vnext_metadata():
                 return False
             
             # 计算每个数据包的大小
@@ -714,6 +719,178 @@ class ProtocolGenerator:
         }
         return True
 
+    def _prepare_vnext_metadata(self) -> bool:
+        endpoints = copy.deepcopy(self.protocol_data.get('endpoints', {}) or {})
+        links = copy.deepcopy(self.protocol_data.get('links', {}) or {})
+
+        endpoint_schema: Dict[str, Any] = {}
+        link_roles: Dict[str, Any] = {}
+
+        if endpoints.get('schema'):
+            schema_path = self.protocol_file.parent / str(endpoints['schema'])
+            endpoint_schema = self._load_yaml_file(schema_path, 'endpoint_schema ')
+            if endpoint_schema is None:
+                return False
+
+        if links.get('roles'):
+            roles_path = self.protocol_file.parent / str(links['roles'])
+            link_roles = self._load_yaml_file(roles_path, 'link_roles ')
+            if link_roles is None:
+                return False
+
+        if not self._validate_vnext_metadata(endpoints, links, link_roles):
+            return False
+
+        compat_endpoints = copy.deepcopy(endpoints.get('compat', {}))
+
+        self.protocol_data['endpoint_schema'] = endpoint_schema
+        self.protocol_data['link_roles'] = link_roles
+        self.protocol_data['compat_endpoints'] = compat_endpoints
+        self.protocol_data['vnext'] = {
+            'endpoints': endpoints,
+            'links': links,
+            'endpoint_schema': endpoint_schema,
+            'link_roles': link_roles,
+            'compat_endpoints': compat_endpoints,
+        }
+        return True
+
+    def _validate_vnext_metadata(
+        self,
+        endpoints: Dict[str, Any],
+        links: Dict[str, Any],
+        link_roles: Dict[str, Any],
+    ) -> bool:
+        endpoint_map = self._validate_vnext_endpoints(endpoints)
+        if endpoint_map is None:
+            return False
+        if not self._validate_vnext_compat_maps(endpoints.get('compat', {}), endpoint_map):
+            return False
+        if not self._validate_vnext_links(links, endpoint_map, link_roles):
+            return False
+        return True
+
+    def _validate_vnext_endpoints(self, endpoints: Dict[str, Any]) -> Optional[Dict[str, Dict[str, Any]]]:
+        endpoint_items = endpoints.get('items', [])
+        if not isinstance(endpoint_items, list):
+            logger.error('endpoints.items必须为列表')
+            return None
+
+        endpoint_map: Dict[str, Dict[str, Any]] = {}
+        for index, endpoint in enumerate(endpoint_items):
+            if not isinstance(endpoint, dict):
+                logger.error(f'endpoints.items[{index}]必须为对象')
+                return None
+
+            endpoint_id = str(endpoint.get('id', '')).strip()
+            endpoint_kind = str(endpoint.get('kind', '')).strip()
+            endpoint_role = str(endpoint.get('role', '')).strip()
+
+            if not endpoint_id or not endpoint_kind or not endpoint_role:
+                logger.error(f'endpoints.items[{index}]缺少必要字段id/kind/role')
+                return None
+            if endpoint_kind not in self.ALLOWED_VNEXT_ENDPOINT_KINDS:
+                logger.error(f'endpoints.items[{index}] kind非法: {endpoint_kind}')
+                return None
+            if endpoint_id in endpoint_map:
+                logger.error(f'endpoints.items[{index}] id重复: {endpoint_id}')
+                return None
+            endpoint_map[endpoint_id] = endpoint
+
+        return endpoint_map
+
+    def _validate_vnext_compat_maps(
+        self,
+        compat_endpoints: Any,
+        endpoint_map: Dict[str, Dict[str, Any]],
+    ) -> bool:
+        if not compat_endpoints:
+            return True
+        if not isinstance(compat_endpoints, dict):
+            logger.error('endpoints.compat必须为对象')
+            return False
+
+        for compat_key in ('by_mid', 'by_device'):
+            compat_map = compat_endpoints.get(compat_key, {})
+            if not compat_map:
+                continue
+            if not isinstance(compat_map, dict):
+                logger.error(f'endpoints.compat.{compat_key}必须为对象')
+                return False
+            for source_key, endpoint_id in compat_map.items():
+                endpoint = endpoint_map.get(str(endpoint_id))
+                if endpoint is None:
+                    logger.error(
+                        f'endpoints.compat.{compat_key}[{source_key}]引用了未知endpoint: {endpoint_id}'
+                    )
+                    return False
+                expected_field = 'mid' if compat_key == 'by_mid' else 'device'
+                if str(endpoint.get(expected_field, '')).strip() != str(source_key).strip():
+                    logger.error(
+                        f'endpoints.compat.{compat_key}[{source_key}]与endpoint {endpoint_id} 不匹配'
+                    )
+                    return False
+        return True
+
+    def _validate_vnext_links(
+        self,
+        links: Dict[str, Any],
+        endpoint_map: Dict[str, Dict[str, Any]],
+        link_roles: Dict[str, Any],
+    ) -> bool:
+        link_items = links.get('items', [])
+        if not isinstance(link_items, list):
+            logger.error('links.items必须为列表')
+            return False
+
+        allowed_roles = link_roles.get('roles', {}) if isinstance(link_roles, dict) else {}
+        if allowed_roles and not isinstance(allowed_roles, dict):
+            logger.error('link_roles.roles必须为对象')
+            return False
+
+        for index, link in enumerate(link_items):
+            if not isinstance(link, dict):
+                logger.error(f'links.items[{index}]必须为对象')
+                return False
+
+            link_id = str(link.get('id', '')).strip()
+            link_role = str(link.get('role', '')).strip()
+            link_transport = str(link.get('transport', '')).strip()
+            link_endpoints = link.get('endpoints', [])
+
+            if not link_id:
+                logger.error(f'links.items[{index}]缺少必要字段id')
+                return False
+            if not link_role:
+                logger.error(f'links.items[{index}]缺少必要字段role')
+                return False
+            if not link_transport:
+                logger.error(f'links.items[{index}]缺少必要字段transport')
+                return False
+            if allowed_roles and link_role not in allowed_roles:
+                logger.error(f'links.items[{index}] role未在link_roles中定义: {link_role}')
+                return False
+            if not isinstance(link_endpoints, list) or not link_endpoints:
+                logger.error(f'links.items[{index}].endpoints必须为列表')
+                return False
+
+            for endpoint_id in link_endpoints:
+                if str(endpoint_id) not in endpoint_map:
+                    logger.error(f'links.items[{index}]引用了未知endpoint: {endpoint_id}')
+                    return False
+
+        return True
+
+    def _build_vnext_context(self) -> Dict[str, Any]:
+        return {
+            'vnext': copy.deepcopy(self.protocol_data.get('vnext', {})),
+            'vnext_endpoints': copy.deepcopy(self.protocol_data.get('endpoints', {})),
+            'vnext_links': copy.deepcopy(self.protocol_data.get('links', {})),
+            'vnext_endpoint_schema': copy.deepcopy(self.protocol_data.get('endpoint_schema', {})),
+            'vnext_link_roles': copy.deepcopy(self.protocol_data.get('link_roles', {})),
+            'vnext_compat_endpoints': copy.deepcopy(self.protocol_data.get('compat_endpoints', {})),
+        }
+
     def get_system_status_packet(self, packets: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """获取SYSTEM_STATUS数据包定义。"""
         for packet in packets:
@@ -829,6 +1006,7 @@ class ProtocolGenerator:
                 'type_mapping': self.protocol_data['type_mapping'],
                 'endianness': self.protocol_data['endianness']
             }
+            mcu_context.update(self._build_vnext_context())
             
             # 生成APP层代码
             self._render_template_with_context(
@@ -1052,6 +1230,7 @@ class ProtocolGenerator:
             'type_mapping': self.protocol_data['type_mapping'],
             'endianness': self.protocol_data['endianness']
         }
+        context.update(self._build_vnext_context())
 
         templates_to_generate = [
             ("ros2/protocol_parser_hpp.j2", include_dir / "protocol" / "protocol_parser.hpp"),

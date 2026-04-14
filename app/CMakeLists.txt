@@ -122,6 +122,10 @@ target_sources(app PRIVATE
   ../drivers/bsp/bsp_tim.c
   ../drivers/rscf/rscf_boot.c
   ../drivers/rscf/rscf_led_status.c
+  ../drivers/rscf/rscf_link_usb.c
+  ../drivers/rscf/rscf_link_uart.c
+  ../drivers/rscf/rscf_link_can.c
+  ../drivers/rscf/rscf_link_spi.c
   ../drivers/rscf/rscf_ext_uart_mux.c
   ../drivers/rscf/rscf_buzzer.c
   ../drivers/rscf/rscf_power_switch.c
@@ -162,10 +166,12 @@ target_sources(app PRIVATE
   ../modules/motor/servo_motor.c
   ../modules/rscf/core/rscf_app_profile.c
   ../modules/rscf/services/rscf_event_bus.c
+  ../modules/rscf/services/rscf_link_service.c
+  ../modules/rscf/services/rscf_service_router.c
+  ../modules/rscf/services/rscf_action_service.c
   ../modules/rscf/services/rscf_daemon_service.c
   ../modules/rscf/services/rscf_health_service.c
   ../modules/rscf/services/rscf_comm_service.c
-  ../modules/rscf/services/rscf_microros_service.c
   ../modules/rscf/services/rscf_chassis_service.c
   ../modules/rscf/services/rscf_robot_service.c
   ../modules/rscf/services/rscf_ros_bridge.c
@@ -179,3 +185,9 @@ target_sources(app PRIVATE
 
 add_dependencies(app rscf_mcu_comm_codegen)
 add_dependencies(app rscf_ioc_validate)
+
+if(CONFIG_RSCF_MICROROS_SERVICE)
+  target_sources(app PRIVATE
+    ../modules/rscf/services/rscf_microros_service.c
+  )
+endif()

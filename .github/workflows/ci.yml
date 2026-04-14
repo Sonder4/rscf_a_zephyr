@@ -5,6 +5,7 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,6 +17,8 @@ concurrency:
 jobs:
   unit-tests:
     runs-on: ubuntu-22.04
+    env:
+      PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -84,7 +87,7 @@ jobs:
         run: |
           source .venv/bin/activate
           cd .workspace
-          west build -b rscf_a_f427iih6 ../app -d build_microros
+          west build -b rscf_a_f427iih6 ../app -d build_vnext
         shell: bash
 
       - name: Upload firmware artifacts
@@ -92,10 +95,10 @@ jobs:
         with:
           name: rscf-a-zephyr-firmware
           path: |
-            .workspace/build_microros/zephyr/zephyr.elf
-            .workspace/build_microros/zephyr/zephyr.hex
-            .workspace/build_microros/zephyr/zephyr.bin
-            .workspace/build_microros/zephyr/zephyr.map
+            .workspace/build_vnext/zephyr/zephyr.elf
+            .workspace/build_vnext/zephyr/zephyr.hex
+            .workspace/build_vnext/zephyr/zephyr.bin
+            .workspace/build_vnext/zephyr/zephyr.map
 
   ros2-workspace-build:
     runs-on: ubuntu-22.04

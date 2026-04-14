@@ -1,0 +1,28 @@
+meta:
+  schema: rscf-link-vnext-endpoint
+  version: "0.1.0"
+  description: "Minimal endpoint schema for RSCF Link vNext."
+fields:
+  - name: id
+    type: string
+    required: true
+    description: "Stable endpoint id."
+  - name: kind
+    type: string
+    required: true
+    enum:
+      - pc
+      - mcu
+      - bridge
+  - name: role
+    type: string
+    required: true
+  - name: mid
+    type: string
+    required: false
+  - name: device
+    type: string
+    required: false
+  - name: notes
+    type: string
+    required: false

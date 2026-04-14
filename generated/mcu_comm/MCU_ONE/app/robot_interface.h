@@ -34,6 +34,10 @@
 bool RobotInterfaceInit(void);
 void RobotInterfaceDeinit(void);
 void RobotInterfaceSetTransport(Transport_interface_t* transport);
+Transport_interface_t* RobotInterfaceResolveTransportOverride(Transport_interface_t* transport);
+void RobotInterfaceOnTransportReady(Transport_interface_t* transport);
+void RobotInterfaceFillCompatSystemStatus(uint8_t *control_plane_bytes, uint16_t len);
+void RobotInterfaceOnCompatSystemCmd(const uint8_t *control_plane_bytes, uint16_t len);
 void RobotInterfaceProcess(void);
 void RobotInterfaceProcessRx(void);
 void RobotInterfaceProcessTxPeriodic(void);

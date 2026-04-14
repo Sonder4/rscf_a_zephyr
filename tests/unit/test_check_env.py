@@ -75,3 +75,25 @@ def test_build_report_detects_gnuarmemb_toolchain() -> None:
     assert report["python3"]["ok"] is True
     assert report["gnuarmemb"]["ok"] is True
     assert report["gnuarmemb"]["variant"] == "gnuarmemb"
+
+
+def test_readme_documents_bridge_default_path() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    docs_index = (REPO_ROOT / "docs" / "README_CN.md").read_text(encoding="utf-8")
+    user_manual = (REPO_ROOT / "docs" / "zephyr-user-manual.md").read_text(encoding="utf-8")
+
+    assert "RSCF Link vNext" in readme
+    assert "rscf_link_bridge" in readme
+    assert "micro-ROS" in readme
+    assert "兼容后端" in readme
+    assert "build_vnext" in readme
+    assert "build_microros" not in readme
+    assert "RSCF Link vNext" in docs_index
+    assert "rscf_link_bridge" in docs_index
+    assert "RSCF Link vNext" in user_manual
+    assert "rscf_link_bridge" in user_manual
+    assert "micro-ROS" in user_manual
+    assert "bridge-default" in user_manual
+    assert "当前 ROS 主链路已经是 micro-ROS" not in user_manual
+    assert "build_vnext" in user_manual
+    assert "build_microros" not in user_manual
